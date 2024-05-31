@@ -15,12 +15,14 @@
 # limitations under the License.
 # Copyright (c) Facebook, Inc. All Rights Reserved
 
+import logging
+
 import torch
 
 from torch import nn
 
 try:
-    from transformers.modeling_bert import (
+    from transformers.models.bert.modeling_bert import (
         BertPreTrainedModel,
         BertModel,
         BertEncoder,
@@ -30,6 +32,8 @@ except ImportError:
     pass
 
 from ..modules import VideoConv1D, VideoTokenMLP, MMBertEmbeddings, Multimodal_Projection
+
+logger = logging.getLogger(__name__)
 
 
 # --------------- fine-tuning models ---------------
@@ -713,13 +717,20 @@ class MultiLayerAttentionMaskBertEncoder(BertEncoder):
                     encoder_attention_mask,
                 )
             else:
+                hidden_states_shape = hidden_states.shape if isinstance(hidden_states, torch.Tensor) else hidden_states
+                layer_attention_mask_shape = layer_attention_mask.shape if isinstance(layer_attention_mask, torch.Tensor) else layer_attention_mask
+                layer_head_mask_shape = layer_head_mask.shape if isinstance(layer_head_mask, torch.Tensor) else layer_head_mask
+                encoder_hidden_states_shape = encoder_hidden_states.shape if isinstance(encoder_hidden_states, torch.Tensor) else encoder_hidden_states
+                encoder_attention_mask_shape = encoder_attention_mask.shape if isinstance(encoder_attention_mask, torch.Tensor) else encoder_attention_mask
+                output_attentions_shape = output_attentions.shape if isinstance(output_attentions, torch.Tensor) else output_attentions
+                #logger.warning(f"\n\thidden_states: {hidden_states_shape}\n\tlayer_attention_mask: {layer_attention_mask_shape}\n\tlayer_head_mask: {layer_head_mask_shape}\n\tencoder_hidden_states: {encoder_hidden_states_shape}\n\tencoder_attention_mask: {encoder_attention_mask_shape}\n\toutput_attentions: {output_attentions_shape}")
                 layer_outputs = layer_module(
-                    hidden_states,
-                    layer_attention_mask,
-                    layer_head_mask,
-                    encoder_hidden_states,
-                    encoder_attention_mask,
-                    output_attentions,
+                    hidden_states = hidden_states,
+                    attention_mask = layer_attention_mask,
+                    head_mask = layer_head_mask,
+                    encoder_hidden_states = encoder_hidden_states,
+                    encoder_attention_mask = encoder_attention_mask,
+                    output_attentions = output_attentions,
                 )
             hidden_states = layer_outputs[0]
             if output_attentions:

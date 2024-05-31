@@ -1,7 +1,7 @@
 dataset:
-  max_video_len: 1
+  max_video_len: 140
   max_len: 96
-  video_processor: RWTHFSVideoProcessor
+  video_processor: RWTHFSRawVideoProcessor
   bert_name: bert-base-uncased
   meta_processor: RWTHFSMetaProcessor
   text_processor: TextProcessor
@@ -9,8 +9,8 @@ dataset:
   val_path: data/rwthfs/val.txt
   train_path: data/rwthfs/train.txt
   gesture_id_path: data/rwthfs/gesture_ids.txt
-  vfeat_dir: /home/gsantm/common/RWTH_Fingerspelling/i3d_feature
-  aligner: DSAligner
+  vfeat_dir: /home/gsantm/common/RWTH_Fingerspelling/npy_videos
+  aligner: DSVideoAligner
 fairseq:
   common:
     fp16: true
@@ -18,7 +18,7 @@ fairseq:
     log_interval: 1000
   dataset:
     num_workers: 1
-    batch_size: 16
+    batch_size: 8
   optimization:
     lr:
     - 5.0e-05
@@ -37,16 +37,20 @@ fairseq:
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: runs/retri/videoclip/rwthfs_i3d
+    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen/
 task_type: sweep_small
 model:
-  model_cls: MMFusionSeparate
+  model_cls: MMFusionWithI3D
   mm_encoder_cls: null
   video_encoder_cls: MMBertForEncoder
   text_encoder_cls: BertModel
   num_hidden_video_layers: 6
-  input_dim: 512
   vfeat_dim: 1024
+  checkpoint_path: '/shares/iict-sp2.ebling.cl.uzh/zifjia/bsl1k//data/bsl5k.pth.tar'
+  num_classes: 5383
+  num_in_frames: 16
+  path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
+  freeze_feature_extractor: True
 loss:
   loss_cls: MMContraLoss
-input_dim: 512
+input_dim: 1024

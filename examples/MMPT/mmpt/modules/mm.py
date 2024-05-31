@@ -17,11 +17,14 @@
 
 
 import torch
+import logging
 
 from torch import nn
 
+logger = logging.getLogger(__name__)
+
 try:
-    from transformers.modeling_bert import (
+    from transformers.models.bert.modeling_bert import (
         BertEmbeddings,
         ACT2FN,
     )

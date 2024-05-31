@@ -10,6 +10,7 @@ import pickle
 import random
 import math
 from collections import defaultdict
+import logging
 
 import numpy as np
 import pandas as pd
@@ -25,6 +26,8 @@ from .processor import (
 )
 
 from .how2processor import TextGenerationProcessor
+
+logger = logging.getLogger(__name__)
 
 
 # ------------- A General Aligner for all downstream tasks-----------------
@@ -115,6 +118,78 @@ class DSNLGAligner(DSAligner):
         })
         return output
 
+class DSVideoAligner(Aligner):
+    """
+    Downstream (DS) video aligner shared by all datasets.
+    """
+    def sliding_window_output_length(self, input_length, kernel_size=16, stride=4):
+        output_length = (input_length - kernel_size) // stride + 1
+        if output_length < 0:
+            return 0
+        return output_length
+
+    def _build_video_seq(self, video_feature, video_clips=None):
+        """
+        `video_feature`: raw video frames (C, N_frames, H, W).
+        `video_clips`: video clip sequence to build.
+        """
+        if not isinstance(video_feature, np.ndarray):
+            raise ValueError(
+                "unsupported type of video_feature", type(video_feature)
+            )
+
+        if video_clips is None:
+            # this is borrowed from DSAligner
+            video_start = 0
+            video_end = min(video_feature.shape[1], self.max_video_len)
+            # the whole sequence is a single clip.
+            video_clips = {"start": [video_start], "end": [video_end]}
+
+        C, N_frames, H, W = video_feature.shape
+        vfeats = np.zeros((C, self.max_video_len, H, W), dtype=np.float32)
+        vmasks = torch.zeros((self.sliding_window_output_length(self.max_video_len),), dtype=torch.bool)
+        video_len = 0
+        for start, end in zip(video_clips["start"], video_clips["end"]):
+            clip_len = min(self.max_video_len - video_len, (end - start))
+            if clip_len > 0:
+                vfeats[:, video_len: video_len + clip_len, :, :] = video_feature[
+                    :, start: start + clip_len, :, :
+                ]
+                vmasks[self.sliding_window_output_length(video_len): self.sliding_window_output_length(video_len + clip_len)] = 1
+                video_len += clip_len
+
+        vfeats = torch.from_numpy(vfeats)
+
+        return vfeats, vmasks
+    
+    def __call__(self, video_id, video_feature, text_feature, wps=0.7):
+        # random sample a starting sec for video.
+        video_start = 0
+        video_end = min(len(video_feature), self.max_video_len)
+        # the whole sequence is a single clip.
+        video_clips = {"start": [video_start], "end": [video_end]}
+
+        text_feature = {
+            "cap": [text_feature],
+            "start": [video_start],
+            "end": [len(text_feature) / wps],
+        }
+        text_clip_indexs = [0]
+
+        vfeats, vmasks = self._build_video_seq(
+            video_feature, video_clips
+        )
+        caps, cmasks = self._build_text_seq(
+            text_feature, text_clip_indexs
+        )
+
+        return {
+            "caps": caps, # T
+            "cmasks": cmasks, # T
+            "vfeats": vfeats, # C x V x H x W
+            "vmasks": vmasks, # V
+            "video_id": video_id,
+        }
 
 # -------------------- MSRVTT ------------------------
 
@@ -928,9 +1003,8 @@ class PoseProcessor(VideoProcessor):
         if self.split == 'train' and self.augment2d:
             pose = pose.augment2d()
 
-        feat = np.nan_to_num(pose.body.data)
-        feat = feat.reshape(feat.shape[0], -1)
-        
+        feat = np.nan_to_num(pose.body.data) # (N_frames, 1, 203, N_channels)
+        feat = feat.reshape(feat.shape[0], -1) # (N_frames, vfeat_dim)
         return feat
 
     def pose_normalization_info(self, pose_header):
@@ -1054,9 +1128,12 @@ class RWTHFSVideoProcessor(VideoProcessor):
             # i3d feature is 1024
             # adapt feature dimension to 512 by average pooling
             feat = feat.reshape(feat.shape[0], feat_dim, int(feat.shape[1] / feat_dim))
-            feat = np.average(feat, axis=2)
-        return feat
+            feat = np.average(feat, axis=2)      
+        return feat # N_frames x Embed_dim
 
+class RWTHFSRawVideoProcessor(VideoProcessor):
+    def __call__(self, video_id):
+        return np.load(os.path.join(self.vfeat_dir, video_id + ".npy")) # C x N_franmes x H x W
 
 class RWTHFSPoseProcessor(PoseProcessor):
     pass
