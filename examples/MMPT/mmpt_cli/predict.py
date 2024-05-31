@@ -3,6 +3,7 @@
 # This source code is licensed under the MIT license found in the
 # LICENSE file in the root directory of this source tree.
 import os
+import sys
 import glob
 import argparse
 import pprint
@@ -10,6 +11,8 @@ import omegaconf
 
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
+
+sys.path.append("/home/gsantm/repositories/signclip/examples/MMPT")
 
 from mmpt.utils import load_config, set_seed
 from mmpt.evaluators import Evaluator
@@ -86,6 +89,7 @@ def main(args):
                     results.append((checkpoint, output))
             # use the one specified by the config lastly.
             model = mmtask.load_checkpoint(config.fairseq.common_eval.path)
+            model.half()
             evaluator = Evaluator(config)
             output = evaluator.evaluate(model, test_dataloader)
             results.append((config.fairseq.common_eval.path, output))

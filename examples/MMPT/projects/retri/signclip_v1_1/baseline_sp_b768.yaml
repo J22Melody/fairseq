@@ -5,13 +5,14 @@ dataset:
   video_processor: PoseProcessor
   text_processor: TextProcessor
   bert_name: bert-base-cased
-  test_path: /home/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/test.txt
-  val_path: /home/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/val.txt
-  train_path: /home/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/train.txt
-  metadata_path: /shares/volk.cl.uzh/amoryo/datasets/SperadTheSign.csv
-  vfeat_dir: /shares/volk.cl.uzh/amoryo/datasets/sign-mt-poses/
+  test_path: /shares/iict-sp2.ebling.cl.uzh/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/test.txt
+  val_path: /shares/iict-sp2.ebling.cl.uzh/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/val.txt
+  train_path: /shares/iict-sp2.ebling.cl.uzh/zifjia/datasets/sign_language_datasets/datasets/spread_the_sign/splits/1.0.0-uzh/train.txt
+  metadata_path: /shares/iict-sp2.ebling.cl.uzh/common/spreadthesign/SperadTheSign.csv
+  vfeat_dir: /shares/iict-sp2.ebling.cl.uzh/common/spreadthesign/sign-mt-poses/
   aligner: DSAligner
   pose_components: 'reduced_face'
+  
 fairseq:
   common:
     fp16: true
@@ -19,7 +20,7 @@ fairseq:
     log_interval: 1000
   dataset:
     num_workers: 4
-    batch_size: 768 # fit on 80GB GPU
+    batch_size: 384 #768 # fit on 80GB GPU
   optimization:
     lr:
     - 5.0e-05

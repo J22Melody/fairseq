@@ -5,6 +5,7 @@
 from .mmfusion import *
 from .transformermodel import *
 from .mmfusionnlg import *
+from .pipeline_with_i3d import *
 
 try:
     from .fairseqmmmodel import *

@@ -17,6 +17,9 @@
 
 
 import torch
+import logging
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 from torch import nn
 
@@ -397,6 +400,33 @@ class MMFusionShare(MMFusion):
         output_hidden_states=False,
         **kwargs
     ):
+        '''
+        caps: B x T
+        cmasks: B x T
+        vfeats: B x N_frames x E
+        vmasks: B x N_frames
+        attention_mask: None
+        video_label: None
+        text_label: None,
+        '''
+        
+        # caps_shape = caps.shape if caps is not None else "None"
+        # cmasks_shape = cmasks.shape if cmasks is not None else "None"
+        # vfeats_shape = vfeats.shape if vfeats is not None else "None"
+        # vmasks_shape = vmasks.shape if vmasks is not None else "None"
+        # attention_mask_shape = attention_mask.shape if attention_mask is not None else "None"
+        # video_label_shape = video_label.shape if video_label is not None else "None"
+        # text_label_shape = text_label.shape if text_label is not None else "None"
+
+        # logger.warning(f"caps: {caps_shape}")
+        # logger.warning(f"cmasks: {cmasks_shape}")
+        # logger.warning(f"vfeats: {vfeats_shape}")
+        # logger.warning(f"vmasks: {vmasks_shape}")
+        # logger.warning(f"vmasks: {vmasks}")
+        # logger.warning(f"attention_mask: {attention_mask_shape}")
+        # logger.warning(f"video_label: {video_label_shape}")
+        # logger.warning(f"text_label: {text_label_shape}\n")
+
         pooled_video = self.forward_video(
             vfeats,
             vmasks,
@@ -538,7 +568,12 @@ class MMFusionSeparate(MMFusionShare):
         cmasks,
         output_hidden_states=False,
         **kwargs
-    ):
+    ):  
+        # vfeats: B x N_frames x vfeat_dim
+        # vmasks: B x N_frames
+        # caps: B x T
+        # cmasks: B x T
+
         input_ids = caps[:, :2]
 
         attention_mask = torch.cat([
@@ -551,6 +586,7 @@ class MMFusionSeparate(MMFusionShare):
             (vmasks.size(0), vmasks.size(1) + 2),
             dtype=torch.long,
             device=vmasks.device)
+
 
         outputs = self.video_encoder(
             input_ids=input_ids,
