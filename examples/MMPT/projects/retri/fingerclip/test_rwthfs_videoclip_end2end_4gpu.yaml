@@ -1,7 +1,9 @@
 dataset:
   max_video_len: 140
   max_len: 96
+  split: test
   video_processor: RWTHFSRawVideoProcessor
+  aligner: DSVideoAligner
   bert_name: bert-base-uncased
   meta_processor: RWTHFSMetaProcessor
   text_processor: TextProcessor
@@ -10,35 +12,15 @@ dataset:
   train_path: data/rwthfs/train.txt
   gesture_id_path: data/rwthfs/gesture_ids.txt
   vfeat_dir: /home/gsantm/common/RWTH_Fingerspelling/npy_videos
-  aligner: DSVideoAligner
+slurm_config: big
+task_type: local_predict
 fairseq:
-  common:
-    fp16: true
-    tensorboard_logdir: run
-    log_interval: 1000
+  common_eval:
+    path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_videoclip_end2end_4gpu/checkpoint_best.pt
   dataset:
-    num_workers: 1
-    batch_size: 8
-  optimization:
-    lr:
-    - 5.0e-05
-    clip_norm: 2.0
-    optimizer: adam
-    adam_betas: (0.9, 0.98)
-    lr_scheduler: polynomial_decay
-    total_num_update: 1000000
-    warmup_updates: 1000
-    weight_decay: 0.0
-    ddp_backend: no_c10d
-    max_epoch: 25
-  checkpoint:
-    no_epoch_checkpoints: true
-    restore_file: runs/retri/videoclip/checkpoint_best.pt
-    reset_optimizer: true
-    reset_dataloader: true
-    reset_meters: true
-    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen_corrected/
-task_type: sweep_small
+    num_workers: 4
+    batch_size: 9
+    valid_subset: test
 model:
   model_cls: MMFusionWithI3D
   mm_encoder_cls: null
@@ -50,7 +32,10 @@ model:
   num_classes: 5383
   num_in_frames: 16
   path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
+  i3d_batch_size: 16
   freeze_feature_extractor: True
-loss:
-  loss_cls: MMContraLoss
+eval:
+  save_path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_videoclip_end2end_4gpu/eval
 input_dim: 1024
+metric: RWTHFSMetric
+predictor: RetrievalPredictor

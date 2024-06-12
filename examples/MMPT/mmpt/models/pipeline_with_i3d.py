@@ -38,7 +38,7 @@ def sliding_windows(
     C, nFrames, H, W = rgb.shape
     # If needed, pad to the minimum clip length
     if nFrames < num_in_frames:
-        rgb_ = torch.zeros(C, num_in_frames, H, W)
+        rgb_ = torch.zeros(C, num_in_frames, H, W, device=rgb.device)
         rgb_[:, :nFrames] = rgb
         rgb_[:, nFrames:] = rgb[:, -1].unsqueeze(1)
         rgb = rgb_
@@ -50,7 +50,7 @@ def sliding_windows(
         plural = "s"
     #print(f"{num_clips} clip{plural} resulted from sliding window processing.")
 
-    rgb_slided = torch.zeros(num_clips, 3, num_in_frames, H, W)
+    rgb_slided = torch.zeros(num_clips, 3, num_in_frames, H, W, device=rgb.device)
     t_mid = []
     # For each clip
     for j in range(num_clips):
@@ -78,6 +78,11 @@ def load_video_feature_extractor(
     from utils.misc import to_torch
     from utils.imutils import im_to_numpy, im_to_torch, resize_generic
     from utils.transforms import color_normalize
+    
+    def remove_prefix(state_dict, prefix):
+        # remove prefix from all keys
+        return {key[len(prefix):]: value for key, value in state_dict.items() if key.startswith(prefix)}
+    
     model = models.InceptionI3d(
         num_classes=num_classes,
         spatiotemporal_squeeze=True,
@@ -89,9 +94,15 @@ def load_video_feature_extractor(
         include_embds=True,
     )
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model = torch.nn.DataParallel(model).to(device)
-    checkpoint = torch.load(checkpoint_path)
-    model.load_state_dict(checkpoint["state_dict"])
+    #model = torch.nn.DataParallel(model).to(device)
+    model.to(device)
+
+    if checkpoint_path is not None:
+        if os.path.exists(checkpoint_path):
+            checkpoint = torch.load(checkpoint_path)
+            state_dict = remove_prefix(checkpoint['state_dict'], 'module.')
+            model.load_state_dict(state_dict)
+            logger.info(f"Loaded I3D from {checkpoint_path}")
     return model
 
 class MMFusionWithI3D(MMFusionSeparate):
@@ -164,6 +175,12 @@ class MMFusionWithI3D(MMFusionSeparate):
             from .transformermodel import Multimodal_Projection
             self.video_projection = Multimodal_Projection()
             self.text_projection = Multimodal_Projection()
+        
+        self.i3d_batch_size = config.fairseq.dataset.batch_size
+        if hasattr(config.model, 'i3d_batch_size'):
+            if config.model.i3d_batch_size is not None:
+                self.i3d_batch_size = config.model.i3d_batch_size
+        logger.info(f"I3D model will use a batch_size of {self.i3d_batch_size}")
 
     def forward_video_feature_extractor(
             self, 
@@ -206,14 +223,13 @@ class MMFusionWithI3D(MMFusionSeparate):
         output_hidden_states=False,
         **kwargs
     ):
-
-        
         # vmasks: B x N_frames
         # caps: B x T
         # cmasks: B x T
 
         vfeats = self.forward_video_feature_extractor(
-            vfeats,
+            vfeats=vfeats,
+            batch_size=self.i3d_batch_size,
         ) # vfeats: B x N_frames x vfeat_dim
 
         pooled_video = self.forward_video(

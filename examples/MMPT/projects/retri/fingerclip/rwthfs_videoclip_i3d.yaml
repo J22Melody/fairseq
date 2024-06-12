@@ -18,7 +18,7 @@ fairseq:
     log_interval: 1000
   dataset:
     num_workers: 1
-    batch_size: 16
+    batch_size: 35
   optimization:
     lr:
     - 5.0e-05

@@ -17,7 +17,7 @@ fairseq:
     tensorboard_logdir: run
     log_interval: 1000
   dataset:
-    num_workers: 1
+    num_workers: 2
     batch_size: 8
   optimization:
     lr:
@@ -28,17 +28,17 @@ fairseq:
     lr_scheduler: polynomial_decay
     total_num_update: 1000000
     warmup_updates: 1000
-    weight_decay: 0.0
+    weight_decay: 0.001
     ddp_backend: no_c10d
     max_epoch: 25
   checkpoint:
     no_epoch_checkpoints: true
-    restore_file: runs/retri/videoclip/checkpoint_best.pt
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen_corrected/
-task_type: sweep_small
+    restore_file: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_videoclip_end2end_4gpu/checkpoint_best.pt
+    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_videoclip_end2end_4gpu/
+task_type: local_single
 model:
   model_cls: MMFusionWithI3D
   mm_encoder_cls: null
@@ -49,8 +49,8 @@ model:
   checkpoint_path: '/shares/iict-sp2.ebling.cl.uzh/zifjia/bsl1k/data/bsl5k.pth.tar'
   num_classes: 5383
   num_in_frames: 16
-  path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
-  freeze_feature_extractor: True
+  path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/" #freeze_feature_extractor: True
+  i3d_batch_size: 16
 loss:
   loss_cls: MMContraLoss
 input_dim: 1024

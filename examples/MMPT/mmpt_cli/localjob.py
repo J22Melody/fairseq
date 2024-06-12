@@ -36,7 +36,6 @@ class LocalJob(BaseJob):
             "fairseq-train", "[yaml]", "--user-dir", "mmpt",
             "--task", "mmtask", "--arch", "mmarch",
             "--criterion", "mmloss",
-            "--distributed-world-size", "2"
         ],
         "local_big": [
             "fairseq-train", "[yaml]", "--user-dir", "mmpt",

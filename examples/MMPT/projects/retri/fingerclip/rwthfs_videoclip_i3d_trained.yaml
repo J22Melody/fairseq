@@ -33,11 +33,11 @@ fairseq:
     max_epoch: 25
   checkpoint:
     no_epoch_checkpoints: true
-    restore_file: runs/retri/videoclip/checkpoint_best.pt
+    restore_file: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_batch_corrected/checkpoint_best.pt
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: runs/retri/videoclip/rwthfs_i3d
+    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_batch_corrected/
 task_type: sweep_small
 model:
   model_cls: MMFusionWithI3D
@@ -46,7 +46,7 @@ model:
   text_encoder_cls: BertModel
   num_hidden_video_layers: 6
   vfeat_dim: 1024
-  checkpoint_path: '/shares/iict-sp2.ebling.cl.uzh/zifjia/bsl1k//data/bsl5k.pth.tar'
+  checkpoint_path: '/shares/iict-sp2.ebling.cl.uzh/zifjia/bsl1k/data/bsl5k.pth.tar'
   num_classes: 5383
   num_in_frames: 16
   path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"

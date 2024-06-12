@@ -16,7 +16,7 @@ slurm_config: big
 task_type: local_predict
 fairseq:
   common_eval:
-    path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d/checkpoint_best.pt
+    path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_batch_corrected/checkpoint_best.pt
   dataset:
     num_workers: 2
     batch_size: 8
@@ -33,7 +33,7 @@ model:
   num_in_frames: 16
   path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
 eval:
-  save_path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d/eval
+  save_path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_batch_corrected/eval
 input_dim: 1024
 metric: RWTHFSMetric
 predictor: RetrievalPredictor

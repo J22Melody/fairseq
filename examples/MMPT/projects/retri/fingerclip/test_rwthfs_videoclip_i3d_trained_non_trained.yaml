@@ -16,7 +16,7 @@ slurm_config: big
 task_type: local_predict
 fairseq:
   common_eval:
-    path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen/checkpoint_best.pt
+    path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen_corrected/checkpoint_best.pt
   dataset:
     num_workers: 2
     batch_size: 8
@@ -34,7 +34,7 @@ model:
   path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
   freeze_feature_extractor: True
 eval:
-  save_path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen/eval
+  save_path: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen_corrected/eval
 input_dim: 1024
 metric: RWTHFSMetric
 predictor: RetrievalPredictor

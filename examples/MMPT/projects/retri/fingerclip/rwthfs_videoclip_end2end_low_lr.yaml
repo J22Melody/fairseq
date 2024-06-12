@@ -17,11 +17,11 @@ fairseq:
     tensorboard_logdir: run
     log_interval: 1000
   dataset:
-    num_workers: 1
-    batch_size: 8
+    num_workers: 2
+    batch_size: 12
   optimization:
     lr:
-    - 5.0e-05
+    - 5.0e-06
     clip_norm: 2.0
     optimizer: adam
     adam_betas: (0.9, 0.98)
@@ -33,11 +33,10 @@ fairseq:
     max_epoch: 25
   checkpoint:
     no_epoch_checkpoints: true
-    restore_file: runs/retri/videoclip/checkpoint_best.pt
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_i3d_frozen_corrected/
+    save_dir: /home/gsantm/common/RWTH_Fingerspelling/fingerclip_experiments/rwthfs_videoclip_end2end_low_lr/
 task_type: sweep_small
 model:
   model_cls: MMFusionWithI3D
@@ -50,7 +49,7 @@ model:
   num_classes: 5383
   num_in_frames: 16
   path_to_i3d_repo: "/home/gsantm/repositories/bsl1k/"
-  freeze_feature_extractor: True
+  i3d_batch_size: 16
 loss:
   loss_cls: MMContraLoss
 input_dim: 1024

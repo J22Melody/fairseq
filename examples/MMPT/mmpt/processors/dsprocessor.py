@@ -128,6 +128,30 @@ class DSVideoAligner(Aligner):
             return 0
         return output_length
 
+    def adapt_mask(self, vmasks_original, kernel_size=16, stride=4):
+        # Compute the new length of the mask
+        original_length = len(vmasks_original)
+        new_length = self.sliding_window_output_length(original_length, kernel_size, stride)
+        
+        # Initialize the new mask list
+        new_mask = []
+
+        # Iterate over the original mask in steps of `stride`
+        for i in range(0, new_length * stride, stride):
+            # Extract the window of size `kernel_size`
+            window = vmasks_original[i:i + kernel_size]
+            
+            # If any value in the window is True, the new mask position should be True
+            if torch.any(window):
+                new_mask.append(True)
+            else:
+                new_mask.append(False)
+        
+        # Convert the new mask list to a tensor
+        new_mask_tensor = torch.tensor(new_mask, dtype=torch.bool)
+        
+        return new_mask_tensor
+
     def _build_video_seq(self, video_feature, video_clips=None):
         """
         `video_feature`: raw video frames (C, N_frames, H, W).
@@ -137,7 +161,6 @@ class DSVideoAligner(Aligner):
             raise ValueError(
                 "unsupported type of video_feature", type(video_feature)
             )
-
         if video_clips is None:
             # this is borrowed from DSAligner
             video_start = 0
@@ -147,7 +170,8 @@ class DSVideoAligner(Aligner):
 
         C, N_frames, H, W = video_feature.shape
         vfeats = np.zeros((C, self.max_video_len, H, W), dtype=np.float32)
-        vmasks = torch.zeros((self.sliding_window_output_length(self.max_video_len),), dtype=torch.bool)
+        vmasks = torch.zeros((self.max_video_len,), dtype=torch.bool)
+
         video_len = 0
         for start, end in zip(video_clips["start"], video_clips["end"]):
             clip_len = min(self.max_video_len - video_len, (end - start))
@@ -155,34 +179,27 @@ class DSVideoAligner(Aligner):
                 vfeats[:, video_len: video_len + clip_len, :, :] = video_feature[
                     :, start: start + clip_len, :, :
                 ]
-                vmasks[self.sliding_window_output_length(video_len): self.sliding_window_output_length(video_len + clip_len)] = 1
+                vmasks[video_len: video_len + clip_len] = 1
                 video_len += clip_len
 
         vfeats = torch.from_numpy(vfeats)
-
-        return vfeats, vmasks
+        return vfeats, self.adapt_mask(vmasks)
     
     def __call__(self, video_id, video_feature, text_feature, wps=0.7):
         # random sample a starting sec for video.
         video_start = 0
-        video_end = min(len(video_feature), self.max_video_len)
-        # the whole sequence is a single clip.
-        video_clips = {"start": [video_start], "end": [video_end]}
-
         text_feature = {
             "cap": [text_feature],
             "start": [video_start],
             "end": [len(text_feature) / wps],
         }
         text_clip_indexs = [0]
-
         vfeats, vmasks = self._build_video_seq(
-            video_feature, video_clips
+            video_feature
         )
         caps, cmasks = self._build_text_seq(
             text_feature, text_clip_indexs
         )
-
         return {
             "caps": caps, # T
             "cmasks": cmasks, # T
