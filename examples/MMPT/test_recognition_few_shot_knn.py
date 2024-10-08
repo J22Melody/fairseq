@@ -28,7 +28,7 @@ np.random.seed(seed)
 # embedding_dir = '/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri/baseline_sp_b768/eval'
 # embedding_dir = '/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri_v1_1/baseline_anonym/eval'
 datasets = ['asl_signs', 'asl_citizen', 'sem_lex']
-# datasets = ['sem_lex']
+datasets = ['pop_sign']
 number_shots = [1, 5, 10, 100]
 top_n = [1, 5, 10]
 
@@ -99,8 +99,8 @@ for dataset in datasets:
         X_train = train_embeddings
         X_test = test_embeddings
 
-        # n_neighbors = len(y_test_labels)
-        n_neighbors = round(math.sqrt(X_train.shape[0]))
+        n_neighbors = len(y_test_labels)
+        # n_neighbors = round(math.sqrt(X_train.shape[0]))
 
         clf = Pipeline(
             steps=[("scaler", StandardScaler()), ("knn", KNeighborsClassifier(n_neighbors=n_neighbors))]

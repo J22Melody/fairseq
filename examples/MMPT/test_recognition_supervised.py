@@ -23,13 +23,13 @@ np.random.seed(seed)
 embedding_dir = '/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri_v1_1/baseline_temporal/eval_flip_full'
 # embedding_dir = '/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri_v1_1/baseline_temporal/eval_anonym_full'
 # datasets = ['asl_signs', 'asl_citizen', 'sem_lex']
-datasets = ['sem_lex']
+datasets = ['pop_sign']
 top_n = [1, 5, 10]
 
 for dataset in datasets:
     print(f'Evaluating {dataset} ...')
 
-    # embedding_dir = f'/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri_asl/{dataset}_finetune/eval'
+    embedding_dir = f'/shares/iict-sp2.ebling.cl.uzh/zifjia/fairseq/examples/MMPT/runs/retri_asl/{dataset}_finetune/eval'
 
     embedding_dir_train = f'{embedding_dir}/{dataset}_train'
     embedding_dir_test = f'{embedding_dir}/{dataset}_test'

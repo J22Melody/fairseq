@@ -5,21 +5,15 @@ dataset:
   video_processor: SignCLIPPoseProcessor
   text_processor: TextProcessor
   bert_name: bert-base-cased
-  # data_dir: /shares/volk.cl.uzh/zifjia/tensorflow_datasets
   data_dir: /shares/iict-sp2.ebling.cl.uzh/zifjia/backups/tensorflow_datasets
-  train_datasets: [
-    # ['asl_citizen', '1.0.0'],
-    # ['sem_lex', '1.0.0'],
-    # ['asl_signs', '1.0.0', '1.0.0-uzh'],
-    ['pop_sign', '1.0.0'],
-  ]
-  valid_datasets: [['asl_signs', '1.0.0', '1.0.0-uzh']]
-  # test_datasets: [['asl_signs', '1.0.0', '1.0.0-uzh']]
+  train_datasets: [['pop_sign', '1.0.0']]
+  valid_datasets: [['pop_sign', '1.0.0']]
   test_path: data/<dataset>/test.txt # placeholder, no use
   val_path: data/<dataset>/val.txt # placeholder, no use
   train_path: data/<dataset>/train.txt # placeholder, no use
   aligner: DSAligner
   pose_components: 'reduced_face'
+  sp_universal_tagging: true
 fairseq:
   common:
     fp16: true
@@ -28,7 +22,6 @@ fairseq:
   dataset:
     num_workers: 1
     batch_size: 256
-    # batch_size: 512 # memory error on 32GB GPU
   optimization:
     lr:
     - 5.0e-05
@@ -46,16 +39,16 @@ fairseq:
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: runs/retri/baseline_asl
+    save_dir: runs/retri_asl/pop_sign_scratch
 task_type: sweep_small
 model:
   model_cls: MMFusionSeparate
   mm_encoder_cls: null
   video_encoder_cls: MMBertForEncoder
   text_encoder_cls: BertModel
-  num_hidden_video_layers: 6
+  num_hidden_video_layers: 12
   vfeat_dim: 609
 loss:
   loss_cls: MMContraLoss
 eval:
-  save_path: runs/retri/baseline_asl
+  save_path: runs/retri_asl/pop_sign_scratch

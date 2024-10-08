@@ -20,17 +20,11 @@ for dataset, version, split in datasets:
     print(f'Loading the {dataset} {version} dataset ... ')
     print('================================')
 
-    extra = {'split': split} if split else {}
-    if dataset == 'spread_the_sign':
-        extra.update({
-            'pose_dir': sp_pose_dir,
-            'csv_path': sp_csv_path,
-        })
-
-    sd_config = SignDatasetConfig(name="holistic", version=version, include_video=False, include_pose="holistic", extra=extra)
+    sd_config = SignDatasetConfig(name="holistic", version=version, include_video=False, include_pose="holistic")
     data = tfds.load(name=dataset, builder_kwargs=dict(config=sd_config), data_dir=data_dir)
 
     splits = ['train', 'validation', 'test']
+    # splits = ['validation', 'test']
     for split in splits:
         data_l = list(data[split])
         print(f'In total {len(data_l)} {split} examples.')
