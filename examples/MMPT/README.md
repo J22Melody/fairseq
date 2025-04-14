@@ -60,7 +60,7 @@ We provide a minimal conda environment config for running SignCLIP inference (th
 
 `conda env create -f environment_inference.yml`
 
-Jump to the [demo-and-model-weights](#demo-and-model-weights) section for a quick demo. 
+Then jump to the [demo-and-model-weights](#demo-and-model-weights) section for a quick demo. 
 
 ### Development
 
