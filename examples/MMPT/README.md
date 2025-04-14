@@ -2,7 +2,7 @@
 
 This document is a guideline for using the code and models and reproducing the findings introduced in our research paper:
 
-[SignCLIP: Connecting Text and Sign Language by Contrastive Learning](https://arxiv.org/abs/2407.01264)
+[SignCLIP: Connecting Text and Sign Language by Contrastive Learning](https://aclanthology.org/2024.emnlp-main.518/)
 
 Please cite and refer to our paper for full discussion and details:
 
@@ -28,6 +28,8 @@ Please cite and refer to our paper for full discussion and details:
 <!-- toc -->
 
 - [Installation](#installation)
+  * [Inference](#inference)
+  * [Development](#development)
 - [Background: Sign Language Representation](#background-sign-language-representation)
 - [FingerCLIP - Fingerspelling Understanding as a Proof-of-concept](#fingerclip---fingerspelling-understanding-as-a-proof-of-concept)
   * [Training](#training)
@@ -50,11 +52,21 @@ Please cite and refer to our paper for full discussion and details:
 
 ## Installation
 
-The codebase is an adaption of [VideoCLIP](https://github.com/facebookresearch/fairseq/tree/main/examples/MMPT), where general videos (e.g., [HowTo100M](https://www.di.ens.fr/willow/research/howto100m/)) are replaced by specific sign language videos (e.g., [How2Sign](https://how2sign.github.io/)) to bring together text and sign language under a same latent space. 
+The codebase is an adaptation of [VideoCLIP](https://github.com/facebookresearch/fairseq/tree/main/examples/MMPT), where general videos (e.g., [HowTo100M](https://www.di.ens.fr/willow/research/howto100m/)) are replaced by specific sign language videos (e.g., [How2Sign](https://how2sign.github.io/)) to bring together text and sign language under the same latent space. 
+
+### Inference 
+
+We provide a minimal conda environment config for running SignCLIP inference (that embeds signing and text) with Python 3.12:
+
+`conda env create -f environment_inference.yml`
+
+Jump to the [demo-and-model-weights](#demo-and-model-weights) section for a quick demo. 
+
+### Development
+
+The development environment requires more complex and legacy dependencies, including `fairseq`. Our future goal is to migrate to the Hugging Face ecosystem, possibly via [multimodalhugs](https://github.com/GerrySant/multimodalhugs). Please contact me if you want to contribute.
 
 See VideoCLIP's original [README](https://github.com/facebookresearch/fairseq/tree/main/examples/MMPT#installation) for an overall introduction to multimodal video understanding and instructions on installing and using the packages:
-
-(we also provide an `environment.yml` but it might be a bit redundant)
 
 ```
 cd fairseq
@@ -67,7 +79,7 @@ pip install -e .
 ```
 
 > The code is developed under Python=3.8.8, Pytorch=1.8, cuda=11.0 with fairseq=1.0.0a0+af0389f and tested under Python=3.8.8 pytorch=1.9 cuda=11.0 fairseq=1.0.0a0+8e7bc73 during code release.
-Most models require `transformers==3.4` for API compatibility `pip install transformers==3.4`. 
+Most models require `transformers==3.4` for API compatibility, `pip install transformers==3.4`. 
 In addition, some downstream tasks may need `conda install pandas`.  
 
 Our repo additionally requires the following packages for the development of SignCLIP:
