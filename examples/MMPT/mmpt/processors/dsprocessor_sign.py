@@ -436,50 +436,31 @@ class SignCLIPMetaProcessor(MetaProcessor):
                         break
                     count = count + 1
 
-                    if self.task and self.task.startswith('identification'):
-                        # for dicta_sign
-                        signed_language_map = {
-                            'GSL': 'gss',
-                            'BSL': 'bfi',
-                            'DGS': 'gsg',
-                            'LSF': 'fsl',
-                        }
-                        signed_language = signed_language_map[datum['signed_language'].numpy().decode('utf-8')]
-
-                        # DGS and BSL videos contain more than one camera angle, excluding for now
-                        if signed_language == 'gsg' or signed_language == 'bfi':
-                            continue
-                        # if signed_language == 'gsg' or signed_language == 'gss':
-                        #     continue
-                        
-                        tag_prompt = f"<en> <{signed_language}>"
-                        text_prompt = f"{tag_prompt} {datum['text_en'].numpy().decode('utf-8')}" if self.task == 'identification_oracle' else tag_prompt
-                    else:
-                        if config.sp_universal_tagging:
-                            # HACK: fine-tuning only for ase and bfi at the moment
-                            if dataset == 'bobsl_islr':
-                                tag_prompt = "<en> <bfi>" 
-                            else:
-                                tag_prompt = "<en> <ase>" 
+                    if config.sp_universal_tagging:
+                        # HACK: fine-tuning only for ase and bfi at the moment
+                        if dataset == 'bobsl_islr':
+                            tag_prompt = "<en> <bfi>" 
                         else:
-                            tag_prompt = "<American Sign Language>"
+                            tag_prompt = "<en> <ase>" 
+                    else:
+                        tag_prompt = "<American Sign Language>"
 
-                        text_content = datum['text'].numpy().decode('utf-8')
+                    text_content = datum['text'].numpy().decode('utf-8')
 
-                        if config.test_in_vocab or config.preprocess_gloss:
-                            if dataset == 'asl_citizen':
-                                text_content = text_content.lower()
-                                text_content = text_content.rstrip(string.digits)
-                            elif dataset == 'sem_lex':
-                                # text_content = text_content.rstrip(string.digits)
-                                # text_content = text_content.rstrip('_')
-                                text_content = re.sub(r'_\d+$', '', text_content)
-                                text_content = text_content.replace('_', ' ')
+                    if config.test_in_vocab or config.preprocess_gloss:
+                        if dataset == 'asl_citizen':
+                            text_content = text_content.lower()
+                            text_content = text_content.rstrip(string.digits)
+                        elif dataset == 'sem_lex':
+                            # text_content = text_content.rstrip(string.digits)
+                            # text_content = text_content.rstrip('_')
+                            text_content = re.sub(r'_\d+$', '', text_content)
+                            text_content = text_content.replace('_', ' ')
 
-                        if config.test_in_vocab and text_content not in self.vocab:
-                            continue
+                    if config.test_in_vocab and text_content not in self.vocab:
+                        continue
 
-                        text_prompt = f"{tag_prompt} {text_content}"
+                    text_prompt = f"{tag_prompt} {text_content}"
 
                     # save memory consumption for 3.5M BOBSL ISLR examples to under 300GB
                     # better solution: use SignCLIPMetaProcessorV2 to load data asynchronously
@@ -527,47 +508,22 @@ class SignCLIPMetaProcessor(MetaProcessor):
             # print(entry)
         print('Total classes:', len(text_to_idxs_num))
         
-        # unique sampler: sample config.unique_sampler_num examples of different text prompts randomly (for a batch)
-        if self.split == 'train' and config.unique_sampler_num:
-            if config.unique_sampler_num > len(text_to_idxs_num):
-                raise ValueError(f'Impossible to sample {config.unique_sampler_num} unique examples given {len(text_to_idxs_num)} unique text prompts.')
-
-            self.unique_sampler_num = config.unique_sampler_num
-            self.text_prompts = list(self.text_to_idxs.keys())
-            self.text_prompts_sampled = []
-
     def __getitem__(self, idx):
-        if hasattr(self, 'unique_sampler_num'):
-            # reset when starting a new epoch or when a batch is full
-            if idx == 0 or len(self.text_prompts_sampled) == self.unique_sampler_num:
-                self.text_prompts = list(self.text_to_idxs.keys())
-                self.text_prompts_sampled = []
-                # print('reset')
+        datum = self.data[idx]
 
-            # randomly sample one example per text prompt
-            sampled_text = random.choice(self.text_prompts)
-            sampled_idx = random.choice(self.text_to_idxs[sampled_text])
-            self.text_prompts.remove(sampled_text)
-            self.text_prompts_sampled.append(sampled_text)
+        # vfeat pre-computed during __init__
+        if 'vfeat' in datum:
+            return idx, datum['text'], datum['vfeat']
 
-            # print(sampled_idx, sampled_text)
-            return sampled_idx, sampled_text
-        else:
-            datum = self.data[idx]
+        # reconstruct pose object
+        tf_pose = datum['pose']
+        fps = int(tf_pose["fps"].numpy())
+        pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
+        dataset = self.datasets[datum['dataset']]
+        pose = Pose(dataset['pose_header'], pose_body)
+        vfeat = self.pose_processer(pose)
 
-            # vfeat pre-computed during __init__
-            if 'vfeat' in datum:
-                return idx, datum['text'], datum['vfeat']
-
-            # reconstruct pose object
-            tf_pose = datum['pose']
-            fps = int(tf_pose["fps"].numpy())
-            pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
-            dataset = self.datasets[datum['dataset']]
-            pose = Pose(dataset['pose_header'], pose_body)
-            vfeat = self.pose_processer(pose)
-
-            return idx, datum['text'], vfeat
+        return idx, datum['text'], vfeat
 
 
 class SignCLIPPoseProcessor(PoseProcessor):
