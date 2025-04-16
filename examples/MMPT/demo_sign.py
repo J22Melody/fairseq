@@ -42,8 +42,9 @@ MAX_FRAMES_DEFAULT = 256  # Default truncate length, can be overridden
 
 # Model configurations (keep these unchanged)
 model_configs = [
-    ("default", "signclip_v1_1/baseline_temporal"),
-    ("asl_citizen", "signclip_asl/asl_citizen_finetune"),
+    ("default", "signclip_v1_1/baseline_temporal"), # multilingual pretrained
+    ("asl_citizen", "signclip_asl/asl_citizen_finetune"), # fine-tuned on ASL Citizen
+    ("asl_finetune", "signclip_asl/asl_finetune"), # fine-tuned on three ASL datasets
 ]
 
 # Cache for models that have been lazily initialized.
@@ -279,6 +280,8 @@ def main():
         text_l = ["<en> <ase> house", "<en> <ase> police"]
         pose_l = [pose, pose]
         print(score_pose_and_text_batch(pose_l, text_l))
+        
+        print(score_pose_and_text_batch(pose_l, text_l, model_name='asl_finetune'))
 
 
 if __name__ == "__main__":
