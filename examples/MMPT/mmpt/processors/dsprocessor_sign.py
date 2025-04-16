@@ -456,6 +456,7 @@ class SignCLIPMetaProcessor(MetaProcessor):
                         text_prompt = f"{tag_prompt} {datum['text_en'].numpy().decode('utf-8')}" if self.task == 'identification_oracle' else tag_prompt
                     else:
                         if config.sp_universal_tagging:
+                            # HACK: fine-tuning only for ase and bfi at the moment
                             if dataset == 'bobsl_islr':
                                 tag_prompt = "<en> <bfi>" 
                             else:
@@ -465,22 +466,21 @@ class SignCLIPMetaProcessor(MetaProcessor):
 
                         text_content = datum['text'].numpy().decode('utf-8')
 
-                        if config.test_in_vocab:
+                        if config.test_in_vocab or config.preprocess_gloss:
                             if dataset == 'asl_citizen':
                                 text_content = text_content.lower()
                                 text_content = text_content.rstrip(string.digits)
                             elif dataset == 'sem_lex':
-                                text_content = text_content.rstrip(string.digits)
-                                text_content = text_content.rstrip('_')
-                                # text_content = re.sub(r'_\d+$', '', text_content)
+                                # text_content = text_content.rstrip(string.digits)
+                                # text_content = text_content.rstrip('_')
+                                text_content = re.sub(r'_\d+$', '', text_content)
                                 text_content = text_content.replace('_', ' ')
 
-                            if text_content not in self.vocab:
-                                continue
+                        if config.test_in_vocab and text_content not in self.vocab:
+                            continue
 
                         text_prompt = f"{tag_prompt} {text_content}"
 
-                    vfeat = None
                     # save memory consumption for 3.5M BOBSL ISLR examples to under 300GB
                     # better solution: use SignCLIPMetaProcessorV2 to load data asynchronously
                     if config.pre_compute_vfeat: 
@@ -491,15 +491,18 @@ class SignCLIPMetaProcessor(MetaProcessor):
                         pose = Pose(pose_header, pose_body)
                         vfeat = self.pose_processer(pose)
 
-                    self.data.append(dict(
-                        # datum,
-                        id=f"{dataset}_{datum['id'].numpy().decode('utf-8')}",
-                        text=text_prompt,
-                        vfeat=vfeat,
-                    ))
-
-                # if config.debug:
-                #     self.data = self.data*3000
+                        self.data.append(dict(
+                            id=f"{dataset}_{datum['id'].numpy().decode('utf-8')}",
+                            text=text_prompt,
+                            vfeat=vfeat,
+                        ))
+                    else:
+                        self.data.append(dict(
+                            datum,
+                            dataset=dataset,
+                            id=f"{dataset}_{datum['id'].numpy().decode('utf-8')}",
+                            text=text_prompt,
+                        ))
 
                 print(f'In total {count} wellformed {split} examples.')
 
@@ -521,6 +524,7 @@ class SignCLIPMetaProcessor(MetaProcessor):
                 print(entry)
             elif i == 10:
                 print('...')
+            # print(entry)
         print('Total classes:', len(text_to_idxs_num))
         
         # unique sampler: sample config.unique_sampler_num examples of different text prompts randomly (for a batch)
@@ -557,9 +561,9 @@ class SignCLIPMetaProcessor(MetaProcessor):
 
             # reconstruct pose object
             tf_pose = datum['pose']
-            # tf_pose = dataset['data_l'][datum['dataset_index']]['pose']
             fps = int(tf_pose["fps"].numpy())
             pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
+            dataset = self.datasets[datum['dataset']]
             pose = Pose(dataset['pose_header'], pose_body)
             vfeat = self.pose_processer(pose)
 

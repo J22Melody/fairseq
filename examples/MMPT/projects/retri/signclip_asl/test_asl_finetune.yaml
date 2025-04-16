@@ -1,0 +1,44 @@
+dataset:
+  # debug: true
+  max_video_len: 256
+  max_len: 64
+  split: test
+  # split: train
+  # train_for_test: true
+  meta_processor: SignCLIPMetaProcessor
+  video_processor: SignCLIPPoseProcessor
+  text_processor: TextProcessor
+  bert_name: bert-base-cased
+  data_dir: /shares/iict-sp2.ebling.cl.uzh/common/tensorflow_datasets
+  test_datasets: [
+    ['pop_sign', '1.0.0'],
+    ['asl_citizen', '1.0.0'],
+    ['sem_lex', '1.0.0'],
+  ]
+  test_separately: true
+  test_path: data/<dataset>/test.txt # placeholder, no use
+  aligner: DSAligner
+  pose_components: 'reduced_face'
+  sp_universal_tagging: true
+  pre_compute_vfeat: true
+  preprocess_gloss: true
+slurm_config: big
+task_type: local_predict
+fairseq:
+  dataset:
+    batch_size: 1024
+    valid_subset: test
+    num_workers: 2
+  common_eval:
+    path: runs/retri_asl/asl_finetune/checkpoint_best.pt
+model:
+  model_cls: MMFusionSeparate
+  mm_encoder_cls: null
+  video_encoder_cls: MMBertForEncoder
+  text_encoder_cls: BertModel
+  num_hidden_video_layers: 12
+  vfeat_dim: 609
+eval:
+  save_path: runs/retri_asl/asl_finetune/eval
+metric: RWTHFSMetric
+predictor: RetrievalPredictor
