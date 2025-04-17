@@ -359,7 +359,7 @@ class ASLSignPoseProcessor(PoseProcessor):
         return pose_data
 
 
-# -------------------- SignCLIP v1 -----------------------
+# -------------------- SignCLIP pretrained on Spreadthesign -----------------------
 
 import re
 import string
@@ -369,6 +369,65 @@ from tqdm import tqdm
 from pose_format.numpy.pose_body import NumPyPoseBody
 from pose_format.pose_header import PoseHeader
 from pose_format.utils.reader import BufferReader
+        
+
+class SignCLIPPretrainMetaProcessor(MetaProcessor):
+    def __init__(self, config):
+        super().__init__(config)
+        random.seed(42)
+
+        if config.debug:
+            config.split = 'test'
+
+        self.vfeat_dir = config.vfeat_dir
+        self.task = config.task
+        split_path = self._get_split_path(config)
+        metadata_df = pd.read_csv(config.metadata_path, dtype=str)
+
+        with open(split_path) as f:
+            lines = []
+            for line in f:
+                video_id = int(line.rstrip('\n'))
+                lines.append(video_id)
+
+            metadata_df = metadata_df.reset_index()
+            metadata_df = metadata_df[metadata_df['index'].isin(lines)]
+            metadata_df = metadata_df[metadata_df['language'] == 'en']
+
+            print(metadata_df)
+
+            print(f'text distribution in the {config.split} set:')
+            print(metadata_df.groupby(['text'])['text'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+            print(f'language distribution in the {config.split} set:')
+            print(metadata_df.groupby(['videoLanguage'])['videoLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+            data = metadata_df.to_dict('records')
+            data = [datum for datum in tqdm(data) if os.path.exists(os.path.join(config.vfeat_dir, datum['pose']))]
+
+            print(f'In total {len(data)} {config.split} examples with poses.')
+
+            self.data = data
+
+            if config.split == 'train':
+                random.shuffle(self.data)
+
+    def __getitem__(self, idx):
+        datum = self.data[idx]
+        video_id = datum['pose'].replace('.pose', '')
+        text = '' if self.task == 'identification' else datum['text']
+        vlan = '<ase>' if self.task == 'conceptualization' else f"<{datum['videoLanguage']}>"
+        text_info = f"<{datum['language']}> {vlan} {text}"
+        return video_id, text_info
+
+
+# -------------------- SignCLIP v1 (ASL, BSL, etc.) (feat. sign_language_datasets) -----------------------
+
+class SignCLIPPoseProcessor(PoseProcessor):
+    def __call__(self, pose):
+        # the pose objects are passed to PoseProcessor
+        feat = super().__call__(None, pose)
+        return feat
 
 
 class SignCLIPMetaProcessor(MetaProcessor):
@@ -526,65 +585,6 @@ class SignCLIPMetaProcessor(MetaProcessor):
         return idx, datum['text'], vfeat
 
 
-class SignCLIPPoseProcessor(PoseProcessor):
-    def __call__(self, pose):
-        # the pose objects are passed to PoseProcessor
-        feat = super().__call__(None, pose)
-        return feat
-        
-
-# -------------------- SignCLIP pretrained on Spreadthesign -----------------------
-
-class SignCLIPPretrainMetaProcessor(MetaProcessor):
-    def __init__(self, config):
-        super().__init__(config)
-        random.seed(42)
-
-        if config.debug:
-            config.split = 'test'
-
-        self.vfeat_dir = config.vfeat_dir
-        self.task = config.task
-        split_path = self._get_split_path(config)
-        metadata_df = pd.read_csv(config.metadata_path, dtype=str)
-
-        with open(split_path) as f:
-            lines = []
-            for line in f:
-                video_id = int(line.rstrip('\n'))
-                lines.append(video_id)
-
-            metadata_df = metadata_df.reset_index()
-            metadata_df = metadata_df[metadata_df['index'].isin(lines)]
-            metadata_df = metadata_df[metadata_df['language'] == 'en']
-
-            print(metadata_df)
-
-            print(f'text distribution in the {config.split} set:')
-            print(metadata_df.groupby(['text'])['text'].count().reset_index(name='count').sort_values(['count'], ascending=False))
-
-            print(f'language distribution in the {config.split} set:')
-            print(metadata_df.groupby(['videoLanguage'])['videoLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
-
-            data = metadata_df.to_dict('records')
-            data = [datum for datum in tqdm(data) if os.path.exists(os.path.join(config.vfeat_dir, datum['pose']))]
-
-            print(f'In total {len(data)} {config.split} examples with poses.')
-
-            self.data = data
-
-            if config.split == 'train':
-                random.shuffle(self.data)
-
-    def __getitem__(self, idx):
-        datum = self.data[idx]
-        video_id = datum['pose'].replace('.pose', '')
-        text = '' if self.task == 'identification' else datum['text']
-        vlan = '<ase>' if self.task == 'conceptualization' else f"<{datum['videoLanguage']}>"
-        text_info = f"<{datum['language']}> {vlan} {text}"
-        return video_id, text_info
-
-
 class SignCLIPMetaProcessorV2(MetaProcessor):
     def __init__(self, config):
         super().__init__(config)
@@ -696,3 +696,68 @@ class SignCLIPMetaProcessorV2(MetaProcessor):
             vfeat = np.concatenate((vfeat, lip_feat), axis=1)
 
         return example_id, text_prompt, vfeat
+
+
+# -------------------- SignCLIP-Suisse -----------------------
+
+
+class SignCLIPSuisseMetaProcessor(MetaProcessor):
+    def __init__(self, config):
+        super().__init__(config)
+        random.seed(42)
+
+        self.pose_processer = SignCLIPPoseProcessor(config) # call pose_processer by meta_processor itself
+        split = 'val' if config.split == 'valid' else config.split
+        metadata_df = pd.read_csv(config[f'{split}_path'], dtype=str)
+
+        print(f'language distribution in the {config.split} set:')
+        print(metadata_df.groupby(['signedLanguage'])['signedLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+        data = metadata_df.to_dict('records')
+        self.data = []
+        language_map = {
+            'dsgs': 'gsg',
+            'lsf-ch': 'fsl',
+            'lis-ch': 'ise',
+        }
+
+        if config.debug:
+            data = data[:10]
+
+        for datum in tqdm(data):
+            spoken_lan = datum['spokenLanguage']
+            sign_lan = language_map[datum['signedLanguage']]
+
+            pose_path = os.path.join(config.vfeat_dir, datum['id'] + ".pose")
+            with open(pose_path, "rb") as f:
+                text = datum['name']
+                # text = re.sub(r' \d+$', '', text)
+                # text = text.lower().title()
+                self.data.append({
+                    'text': f"<{spoken_lan}> <{sign_lan}> {text}",
+                    'pose': Pose.read(f),
+                })
+
+            example_pose_path = os.path.join(config.vfeat_example_dir, datum['id'] + ".pose")
+            if os.path.exists(example_pose_path):
+                with open(example_pose_path, "rb") as f:
+                    text = datum['example']
+                    self.data.append({
+                        'text': f"<{spoken_lan}> <{sign_lan}> {text}",
+                        'pose': Pose.read(f),
+                    })
+
+        print(f'In total {len(self.data)} {config.split} examples with poses.')
+
+        if config.split == 'train':
+            random.shuffle(self.data)
+
+        print('Print some example text prompts:')
+        for datum in self.data[:20]:
+            print(datum['text'])
+
+    def __getitem__(self, idx):
+        datum = self.data[idx]
+        vfeat = self.pose_processer(datum['pose'])
+
+        return idx, datum['text'], vfeat

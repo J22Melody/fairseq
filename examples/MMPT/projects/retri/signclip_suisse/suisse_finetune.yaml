@@ -1,25 +1,20 @@
 dataset:
-  debug: true
+  # debug: true
   max_video_len: 256
   max_len: 64
-  meta_processor: SignCLIPMetaProcessor
+  meta_processor: SignCLIPSuisseMetaProcessor
   video_processor: SignCLIPPoseProcessor
   text_processor: TextProcessor
   bert_name: bert-base-cased
-  data_dir: /shares/iict-sp2.ebling.cl.uzh/common/tensorflow_datasets
-  train_datasets: [
-    ['sign_suisse', '1.0.0'],
-  ]
-  valid_datasets: [
-    ['sign_suisse', '1.0.0'],
-  ]
-  test_path: data/<dataset>/test.txt # placeholder, no use
-  val_path: data/<dataset>/val.txt # placeholder, no use
-  train_path: data/<dataset>/train.txt # placeholder, no use
+  test_path: data/signsuisse/metadata_test.csv
+  val_path: data/signsuisse/metadata_train_val.csv
+  train_path: data/signsuisse/metadata_train_train.csv
+  vfeat_dir: /shares/easier.ebling.cl.uzh/WMT_23/signsuisse/mediapipe_new
+  vfeat_example_dir: /shares/easier.ebling.cl.uzh/WMT_23/signsuisse/example_mediapipe/
   aligner: DSAligner
   pose_components: 'reduced_face'
   sp_universal_tagging: true
-  pre_compute_vfeat: true
+  # pre_compute_vfeat: true
   # preprocess_gloss: true
   # augment_temporal: true
 fairseq:
