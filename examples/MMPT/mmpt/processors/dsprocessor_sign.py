@@ -359,7 +359,7 @@ class ASLSignPoseProcessor(PoseProcessor):
         return pose_data
 
 
-# -------------------- SignCLIP v1 -----------------------
+# -------------------- SignCLIP pretrained on Spreadthesign -----------------------
 
 import re
 import string
@@ -369,6 +369,65 @@ from tqdm import tqdm
 from pose_format.numpy.pose_body import NumPyPoseBody
 from pose_format.pose_header import PoseHeader
 from pose_format.utils.reader import BufferReader
+        
+
+class SignCLIPPretrainMetaProcessor(MetaProcessor):
+    def __init__(self, config):
+        super().__init__(config)
+        random.seed(42)
+
+        if config.debug:
+            config.split = 'test'
+
+        self.vfeat_dir = config.vfeat_dir
+        self.task = config.task
+        split_path = self._get_split_path(config)
+        metadata_df = pd.read_csv(config.metadata_path, dtype=str)
+
+        with open(split_path) as f:
+            lines = []
+            for line in f:
+                video_id = int(line.rstrip('\n'))
+                lines.append(video_id)
+
+            metadata_df = metadata_df.reset_index()
+            metadata_df = metadata_df[metadata_df['index'].isin(lines)]
+            metadata_df = metadata_df[metadata_df['language'] == 'en']
+
+            print(metadata_df)
+
+            print(f'text distribution in the {config.split} set:')
+            print(metadata_df.groupby(['text'])['text'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+            print(f'language distribution in the {config.split} set:')
+            print(metadata_df.groupby(['videoLanguage'])['videoLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+            data = metadata_df.to_dict('records')
+            data = [datum for datum in tqdm(data) if os.path.exists(os.path.join(config.vfeat_dir, datum['pose']))]
+
+            print(f'In total {len(data)} {config.split} examples with poses.')
+
+            self.data = data
+
+            if config.split == 'train':
+                random.shuffle(self.data)
+
+    def __getitem__(self, idx):
+        datum = self.data[idx]
+        video_id = datum['pose'].replace('.pose', '')
+        text = '' if self.task == 'identification' else datum['text']
+        vlan = '<ase>' if self.task == 'conceptualization' else f"<{datum['videoLanguage']}>"
+        text_info = f"<{datum['language']}> {vlan} {text}"
+        return video_id, text_info
+
+
+# -------------------- SignCLIP v1 (ASL, BSL, etc.) (feat. sign_language_datasets) -----------------------
+
+class SignCLIPPoseProcessor(PoseProcessor):
+    def __call__(self, pose):
+        # the pose objects are passed to PoseProcessor
+        feat = super().__call__(None, pose)
+        return feat
 
 
 class SignCLIPMetaProcessor(MetaProcessor):
@@ -436,50 +495,31 @@ class SignCLIPMetaProcessor(MetaProcessor):
                         break
                     count = count + 1
 
-                    if self.task and self.task.startswith('identification'):
-                        # for dicta_sign
-                        signed_language_map = {
-                            'GSL': 'gss',
-                            'BSL': 'bfi',
-                            'DGS': 'gsg',
-                            'LSF': 'fsl',
-                        }
-                        signed_language = signed_language_map[datum['signed_language'].numpy().decode('utf-8')]
-
-                        # DGS and BSL videos contain more than one camera angle, excluding for now
-                        if signed_language == 'gsg' or signed_language == 'bfi':
-                            continue
-                        # if signed_language == 'gsg' or signed_language == 'gss':
-                        #     continue
-                        
-                        tag_prompt = f"<en> <{signed_language}>"
-                        text_prompt = f"{tag_prompt} {datum['text_en'].numpy().decode('utf-8')}" if self.task == 'identification_oracle' else tag_prompt
-                    else:
-                        if config.sp_universal_tagging:
-                            # HACK: fine-tuning only for ase and bfi at the moment
-                            if dataset == 'bobsl_islr':
-                                tag_prompt = "<en> <bfi>" 
-                            else:
-                                tag_prompt = "<en> <ase>" 
+                    if config.sp_universal_tagging:
+                        # HACK: fine-tuning only for ase and bfi at the moment
+                        if dataset == 'bobsl_islr':
+                            tag_prompt = "<en> <bfi>" 
                         else:
-                            tag_prompt = "<American Sign Language>"
+                            tag_prompt = "<en> <ase>" 
+                    else:
+                        tag_prompt = "<American Sign Language>"
 
-                        text_content = datum['text'].numpy().decode('utf-8')
+                    text_content = datum['text'].numpy().decode('utf-8')
 
-                        if config.test_in_vocab or config.preprocess_gloss:
-                            if dataset == 'asl_citizen':
-                                text_content = text_content.lower()
-                                text_content = text_content.rstrip(string.digits)
-                            elif dataset == 'sem_lex':
-                                # text_content = text_content.rstrip(string.digits)
-                                # text_content = text_content.rstrip('_')
-                                text_content = re.sub(r'_\d+$', '', text_content)
-                                text_content = text_content.replace('_', ' ')
+                    if config.test_in_vocab or config.preprocess_gloss:
+                        if dataset == 'asl_citizen':
+                            text_content = text_content.lower()
+                            text_content = text_content.rstrip(string.digits)
+                        elif dataset == 'sem_lex':
+                            # text_content = text_content.rstrip(string.digits)
+                            # text_content = text_content.rstrip('_')
+                            text_content = re.sub(r'_\d+$', '', text_content)
+                            text_content = text_content.replace('_', ' ')
 
-                        if config.test_in_vocab and text_content not in self.vocab:
-                            continue
+                    if config.test_in_vocab and text_content not in self.vocab:
+                        continue
 
-                        text_prompt = f"{tag_prompt} {text_content}"
+                    text_prompt = f"{tag_prompt} {text_content}"
 
                     # save memory consumption for 3.5M BOBSL ISLR examples to under 300GB
                     # better solution: use SignCLIPMetaProcessorV2 to load data asynchronously
@@ -527,106 +567,22 @@ class SignCLIPMetaProcessor(MetaProcessor):
             # print(entry)
         print('Total classes:', len(text_to_idxs_num))
         
-        # unique sampler: sample config.unique_sampler_num examples of different text prompts randomly (for a batch)
-        if self.split == 'train' and config.unique_sampler_num:
-            if config.unique_sampler_num > len(text_to_idxs_num):
-                raise ValueError(f'Impossible to sample {config.unique_sampler_num} unique examples given {len(text_to_idxs_num)} unique text prompts.')
-
-            self.unique_sampler_num = config.unique_sampler_num
-            self.text_prompts = list(self.text_to_idxs.keys())
-            self.text_prompts_sampled = []
-
-    def __getitem__(self, idx):
-        if hasattr(self, 'unique_sampler_num'):
-            # reset when starting a new epoch or when a batch is full
-            if idx == 0 or len(self.text_prompts_sampled) == self.unique_sampler_num:
-                self.text_prompts = list(self.text_to_idxs.keys())
-                self.text_prompts_sampled = []
-                # print('reset')
-
-            # randomly sample one example per text prompt
-            sampled_text = random.choice(self.text_prompts)
-            sampled_idx = random.choice(self.text_to_idxs[sampled_text])
-            self.text_prompts.remove(sampled_text)
-            self.text_prompts_sampled.append(sampled_text)
-
-            # print(sampled_idx, sampled_text)
-            return sampled_idx, sampled_text
-        else:
-            datum = self.data[idx]
-
-            # vfeat pre-computed during __init__
-            if 'vfeat' in datum:
-                return idx, datum['text'], datum['vfeat']
-
-            # reconstruct pose object
-            tf_pose = datum['pose']
-            fps = int(tf_pose["fps"].numpy())
-            pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
-            dataset = self.datasets[datum['dataset']]
-            pose = Pose(dataset['pose_header'], pose_body)
-            vfeat = self.pose_processer(pose)
-
-            return idx, datum['text'], vfeat
-
-
-class SignCLIPPoseProcessor(PoseProcessor):
-    def __call__(self, pose):
-        # the pose objects are passed to PoseProcessor
-        feat = super().__call__(None, pose)
-        return feat
-        
-
-# -------------------- SignCLIP pretrained on Spreadthesign -----------------------
-
-class SignCLIPPretrainMetaProcessor(MetaProcessor):
-    def __init__(self, config):
-        super().__init__(config)
-        random.seed(42)
-
-        if config.debug:
-            config.split = 'test'
-
-        self.vfeat_dir = config.vfeat_dir
-        self.task = config.task
-        split_path = self._get_split_path(config)
-        metadata_df = pd.read_csv(config.metadata_path, dtype=str)
-
-        with open(split_path) as f:
-            lines = []
-            for line in f:
-                video_id = int(line.rstrip('\n'))
-                lines.append(video_id)
-
-            metadata_df = metadata_df.reset_index()
-            metadata_df = metadata_df[metadata_df['index'].isin(lines)]
-            metadata_df = metadata_df[metadata_df['language'] == 'en']
-
-            print(metadata_df)
-
-            print(f'text distribution in the {config.split} set:')
-            print(metadata_df.groupby(['text'])['text'].count().reset_index(name='count').sort_values(['count'], ascending=False))
-
-            print(f'language distribution in the {config.split} set:')
-            print(metadata_df.groupby(['videoLanguage'])['videoLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
-
-            data = metadata_df.to_dict('records')
-            data = [datum for datum in tqdm(data) if os.path.exists(os.path.join(config.vfeat_dir, datum['pose']))]
-
-            print(f'In total {len(data)} {config.split} examples with poses.')
-
-            self.data = data
-
-            if config.split == 'train':
-                random.shuffle(self.data)
-
     def __getitem__(self, idx):
         datum = self.data[idx]
-        video_id = datum['pose'].replace('.pose', '')
-        text = '' if self.task == 'identification' else datum['text']
-        vlan = '<ase>' if self.task == 'conceptualization' else f"<{datum['videoLanguage']}>"
-        text_info = f"<{datum['language']}> {vlan} {text}"
-        return video_id, text_info
+
+        # vfeat pre-computed during __init__
+        if 'vfeat' in datum:
+            return idx, datum['text'], datum['vfeat']
+
+        # reconstruct pose object
+        tf_pose = datum['pose']
+        fps = int(tf_pose["fps"].numpy())
+        pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
+        dataset = self.datasets[datum['dataset']]
+        pose = Pose(dataset['pose_header'], pose_body)
+        vfeat = self.pose_processer(pose)
+
+        return idx, datum['text'], vfeat
 
 
 class SignCLIPMetaProcessorV2(MetaProcessor):
@@ -740,3 +696,68 @@ class SignCLIPMetaProcessorV2(MetaProcessor):
             vfeat = np.concatenate((vfeat, lip_feat), axis=1)
 
         return example_id, text_prompt, vfeat
+
+
+# -------------------- SignCLIP-Suisse -----------------------
+
+
+class SignCLIPSuisseMetaProcessor(MetaProcessor):
+    def __init__(self, config):
+        super().__init__(config)
+        random.seed(42)
+
+        self.pose_processer = SignCLIPPoseProcessor(config) # call pose_processer by meta_processor itself
+        split = 'val' if config.split == 'valid' else config.split
+        metadata_df = pd.read_csv(config[f'{split}_path'], dtype=str)
+
+        print(f'language distribution in the {config.split} set:')
+        print(metadata_df.groupby(['signedLanguage'])['signedLanguage'].count().reset_index(name='count').sort_values(['count'], ascending=False))
+
+        data = metadata_df.to_dict('records')
+        self.data = []
+        language_map = {
+            'dsgs': 'gsg',
+            'lsf-ch': 'fsl',
+            'lis-ch': 'ise',
+        }
+
+        if config.debug:
+            data = data[:10]
+
+        for datum in tqdm(data):
+            spoken_lan = datum['spokenLanguage']
+            sign_lan = language_map[datum['signedLanguage']]
+
+            pose_path = os.path.join(config.vfeat_dir, datum['id'] + ".pose")
+            with open(pose_path, "rb") as f:
+                text = datum['name']
+                # text = re.sub(r' \d+$', '', text)
+                # text = text.lower().title()
+                self.data.append({
+                    'text': f"<{spoken_lan}> <{sign_lan}> {text}",
+                    'pose': Pose.read(f),
+                })
+
+            example_pose_path = os.path.join(config.vfeat_example_dir, datum['id'] + ".pose")
+            if os.path.exists(example_pose_path):
+                with open(example_pose_path, "rb") as f:
+                    text = datum['example']
+                    self.data.append({
+                        'text': f"<{spoken_lan}> <{sign_lan}> {text}",
+                        'pose': Pose.read(f),
+                    })
+
+        print(f'In total {len(self.data)} {config.split} examples with poses.')
+
+        if config.split == 'train':
+            random.shuffle(self.data)
+
+        print('Print some example text prompts:')
+        for datum in self.data[:20]:
+            print(datum['text'])
+
+    def __getitem__(self, idx):
+        datum = self.data[idx]
+        vfeat = self.pose_processer(datum['pose'])
+
+        return idx, datum['text'], vfeat
