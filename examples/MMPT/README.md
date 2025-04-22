@@ -378,9 +378,11 @@ python demo_sign.py /home/ubuntu/house_sp.pose
 
 We released the model weights for:
 
-- **E3.2**: `rwthfs_hand_dominant_aug`,
-- **E7.2**: `baseline_temporal`,
-- and ones fine-tuned for the three ASL datasets
+- FingerCLIP (**E3.2**): `rwthfs_hand_dominant_aug`,
+- SignCLIP-multilingual (**E7.2**): `baseline_temporal`,
+- SignCLIP-ASL: fine-tuned on the three ASL datasets (mentioned in the paper),
+- SignCLIP-BSL: fine-tuned on [BOBSL sign spottings](https://www.robots.ox.ac.uk/~vgg/data/bobsl/#isolated_sign),
+- SignCLIP-Suisse: fine-tuned on [Signsuisse](https://www.wmt-slt.com/data#h.l0qcgunwhkqt),
 
 here (others are available on request):
 
