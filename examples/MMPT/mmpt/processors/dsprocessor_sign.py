@@ -39,6 +39,7 @@ class PoseProcessor(VideoProcessor):
         self.flip_pose = config.flip_pose
         self.augment2d = config.augment2d
         self.augment_temporal = config.augment_temporal
+        self.augment_temporal_chance = config.augment_temporal_chance
         self.gaussian_noise = config.gaussian_noise
         self.max_video_len = config.max_video_len
         self.preprocess = config.preprocess
@@ -106,11 +107,12 @@ class PoseProcessor(VideoProcessor):
             if self.augment2d:
                 pose = pose.augment2d()
             if self.augment_temporal and pose.body.data.shape[0] > 1:
-                old_fps = pose.body.fps
-                ratio = np.random.normal(loc=1, scale=0.2)
-                if pose.body.data.shape[0] * ratio < self.max_video_len:
-                    new_fps = round(old_fps * ratio)
-                    pose = pose.interpolate(new_fps, kind='linear')
+                if not self.augment_temporal_chance or random.random() < self.augment_temporal_chance:
+                    old_fps = pose.body.fps
+                    ratio = np.random.normal(loc=1, scale=0.2)
+                    if pose.body.data.shape[0] * ratio < self.max_video_len:
+                        new_fps = round(old_fps * ratio)
+                        pose = pose.interpolate(new_fps, kind='linear')
             if self.gaussian_noise:
                 noise_std = 0.001
                 noise = np.random.normal(scale=noise_std, size=pose.body.data.shape)
@@ -684,16 +686,19 @@ class SignCLIPMetaProcessorV2(MetaProcessor):
         text_content = datum['text'].numpy().decode('utf-8')
         text_prompt = f"{tag_prompt} {text_content}"
 
-        # reconstruct pose object
-        tf_pose = datum['pose']
-        fps = int(tf_pose["fps"].numpy())
-        pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
-        pose = Pose(self.pose_header, pose_body)
-        vfeat = self.pose_processer(pose)
+        if self.config.only_lip_reading:
+            vfeat = datum['lip'].numpy()
+        else:
+            # reconstruct pose object
+            tf_pose = datum['pose']
+            fps = int(tf_pose["fps"].numpy())
+            pose_body = NumPyPoseBody(fps, tf_pose["data"].numpy(), tf_pose["conf"].numpy())
+            pose = Pose(self.pose_header, pose_body)
+            vfeat = self.pose_processer(pose)
 
-        if self.config.include_lip_reading:
-            lip_feat = datum['lip'].numpy()
-            vfeat = np.concatenate((vfeat, lip_feat), axis=1)
+            if self.config.include_lip_reading:
+                lip_feat = datum['lip'].numpy()
+                vfeat = np.concatenate((vfeat, lip_feat), axis=1)
 
         return example_id, text_prompt, vfeat
 

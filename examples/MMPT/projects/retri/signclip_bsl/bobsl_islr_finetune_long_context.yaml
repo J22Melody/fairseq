@@ -40,12 +40,12 @@ fairseq:
     ddp_backend: no_c10d
     max_epoch: 25
   checkpoint:
-    restore_file: runs/retri_v1_1/baseline_temporal/checkpoint_best.pt
+    restore_file: /users/zifan/sign_clip/runs/retri_v1_1/baseline_temporal/checkpoint_best.pt
     no_epoch_checkpoints: true
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: runs/retri_bsl/bobsl_islr_finetune
+    save_dir: /users/zifan/sign_clip/runs/retri_bsl/bobsl_islr_finetune
 task_type: sweep_small
 model:
   model_cls: MMFusionSeparate
@@ -57,4 +57,4 @@ model:
 loss:
   loss_cls: MMContraLoss
 eval:
-  save_path: runs/retri_bsl/bobsl_islr_finetune
+  save_path: /users/zifan/sign_clip/runs/retri_bsl/bobsl_islr_finetune
