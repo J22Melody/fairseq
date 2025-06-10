@@ -211,8 +211,9 @@ if __name__ == "__main__":
     parser.add_argument(
         "--sign_clip_embedding_dir",
         type=str,
-        default="/scratch/shared/beegfs/zifan/runs/retri_bsl/bobsl_islr_finetune/eval_v3",
-        help="Base directory for precomputed sign_clip embeddings."
+        nargs="+",  # Allow one or more directories.
+        default=["/scratch/shared/beegfs/zifan/runs/retri_bsl/bobsl_islr_finetune/eval_v3"],
+        help="One or more base directories for precomputed sign_clip embeddings. If more than one is provided, embeddings from each directory will be concatenated."
     )
     parser.add_argument(
         "--pooling_method",
@@ -294,22 +295,31 @@ if __name__ == "__main__":
     if ("sign_clip" in features) and (not args.sign_clip_from_episode):
         print("Loading precomputed embeddings...")
         emb_start_time = time.perf_counter()
-        if args.dataset_for_training == "validation":
-            train_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_valid")
-        elif args.dataset_for_training == "test":
-            train_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_test")
-        else:  # "training"
-            train_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_train")
         
-        if args.dataset_for_test == "training":
-            test_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_train")
-        elif args.dataset_for_test == "validation":
-            test_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_valid")
-        elif args.dataset_for_test == "test":
-            test_emb_dir = os.path.join(args.sign_clip_embedding_dir, "bobsl_islr_test")
-            
-        train_embeddings = load_embedding_lookup(train_emb_dir)
-        test_embeddings = load_embedding_lookup(test_emb_dir)
+        # Load and concatenate training embeddings from all provided directories.
+        train_embeddings_list = []
+        for base_dir in args.sign_clip_embedding_dir:
+            if args.dataset_for_training == "validation":
+                train_emb_dir = os.path.join(base_dir, "bobsl_islr_valid")
+            elif args.dataset_for_training == "test":
+                train_emb_dir = os.path.join(base_dir, "bobsl_islr_test")
+            else:  # "training"
+                train_emb_dir = os.path.join(base_dir, "bobsl_islr_train")
+            train_embeddings_list.append(load_embedding_lookup(train_emb_dir))
+        train_embeddings = np.concatenate(train_embeddings_list, axis=1)
+
+        # Load and concatenate testing embeddings from all provided directories.
+        test_embeddings_list = []
+        for base_dir in args.sign_clip_embedding_dir:
+            if args.dataset_for_test == "training":
+                test_emb_dir = os.path.join(base_dir, "bobsl_islr_train")
+            elif args.dataset_for_test == "validation":
+                test_emb_dir = os.path.join(base_dir, "bobsl_islr_valid")
+            elif args.dataset_for_test == "test":
+                test_emb_dir = os.path.join(base_dir, "bobsl_islr_test")
+            test_embeddings_list.append(load_embedding_lookup(test_emb_dir))
+        test_embeddings = np.concatenate(test_embeddings_list, axis=1)
+        
         emb_load_time = time.perf_counter() - emb_start_time
         print(f"Time to load embeddings: {emb_load_time:.2f} seconds")
     else:
