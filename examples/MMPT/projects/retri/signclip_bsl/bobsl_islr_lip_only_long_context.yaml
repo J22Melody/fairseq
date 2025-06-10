@@ -1,7 +1,7 @@
 dataset:
   # debug: true
-  max_video_len: 128
-  max_len: 128
+  max_video_len: 400
+  max_len: 256
   meta_processor: SignCLIPMetaProcessorV2
   video_processor: SignCLIPPoseProcessor
   text_processor: TextProcessor

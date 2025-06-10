@@ -490,6 +490,7 @@ def main():
 
     total_pose_files_found = 0
 
+    # video_ids.reverse()
     for vid in video_ids:
         save_path = os.path.join(args.save_dir, f"{vid}.npy")
         if os.path.exists(save_path) and not args.overwrite:
