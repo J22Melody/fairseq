@@ -69,6 +69,14 @@ class MMPTModel(nn.Module):
         # assert bsz == 1, "only bsz=1 is supported now, received video_frames.size()={video_frames.size()}"
         seq_len = video_frames.size(1)
         assert seq_len <= self.max_video_len, f"Video too long. Received frame count {video_frames.size(1)} greater than configured max_video_len ({self.max_video_len})"
+        # if seq_len > self.max_video_len:
+        #     import warnings
+        #     warnings.warn(
+        #         f"Video too long. Truncating from {seq_len} to {self.max_video_len} frames.",
+        #         UserWarning
+        #     )
+        #     video_frames = video_frames[:, :self.max_video_len]
+        #     seq_len = self.max_video_len
         if self.video_encoder:
             video_frames = video_frames.view(-1, *video_frames.size()[2:])
             vfeats = self.video_encoder(video_frames.permute(0, 4, 1, 2, 3))

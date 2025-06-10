@@ -3,7 +3,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'    # Suppress TensorFlow C++ backend lo
 os.environ['GLOG_minloglevel'] = '3'          # Suppress GLOG messages from XLA/CUDA
 
 import warnings
-warnings.filterwarnings("ignore")           # Suppress Python warnings
+# warnings.filterwarnings("ignore")           # Suppress Python warnings
 
 import logging
 logging.getLogger('tensorflow').setLevel(logging.ERROR)  # Suppress TensorFlow Python logs
@@ -42,9 +42,10 @@ MAX_FRAMES_DEFAULT = 256  # Default truncate length, can be overridden
 
 # Model configurations (keep these unchanged)
 model_configs = [
-    ("default", "signclip_v1_1/baseline_temporal"), # multilingual pretrained
+    ("default", "signclip_v1_1/baseline_temporal_inference"), # multilingual pretrained
     ("asl_citizen", "signclip_asl/asl_citizen_finetune"), # fine-tuned on ASL Citizen
     ("asl_finetune", "signclip_asl/asl_finetune"), # fine-tuned on three ASL datasets
+    ("suisse", "signclip_suisse/suisse_finetune_inference"), # fine-tuned on Signsuisse
 ]
 
 # Cache for models that have been lazily initialized.
@@ -71,7 +72,8 @@ def get_model(model_name):
 
     # Load the model, tokenizer, and aligner.
     model, tokenizer, aligner = MMPTModel.from_pretrained(
-        f"projects/retri/{config_path}.yaml",
+        # f"projects/retri/{config_path}.yaml",
+        f"/home/zifjia/fairseq/examples/MMPT/projects/retri/{config_path}.yaml",
         video_encoder=None,
     )
     model.eval()
@@ -163,7 +165,22 @@ def embed_pose(pose, model_name='default'):
     for p in poses:
         pose_frames = preprocess_pose(p)
         pose_frames_l.append(pose_frames)
-    pose_frames_l = torch.cat(pose_frames_l)
+
+    # 1) find the longest sequence
+    max_len = max(pf.shape[1] for pf in pose_frames_l)
+
+    # 2) pad each to max_len on the time‐axis
+    padded = []
+    for pf in pose_frames_l:
+        pad_len = max_len - pf.shape[1]
+        if pad_len > 0:
+            # create zeros of shape (batch=1, pad_len, features)
+            pad = pf.new_zeros((pf.shape[0], pad_len, pf.shape[2]))
+            pf = torch.cat([pf, pad], dim=1)
+        padded.append(pf)
+
+    # 3) now you can concatenate without size mismatches
+    pose_frames_l = torch.cat(padded, dim=0)
 
     batch_size = len(poses)
 

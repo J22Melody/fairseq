@@ -716,7 +716,7 @@ class SignCLIPSuisseMetaProcessor(MetaProcessor):
         data = metadata_df.to_dict('records')
         self.data = []
         language_map = {
-            'dsgs': 'gsg',
+            'dsgs': 'sgg',
             'lsf-ch': 'fsl',
             'lis-ch': 'ise',
         }

@@ -19,6 +19,7 @@
 import torch
 
 from torch import nn
+import torch.nn.functional as F
 
 
 
@@ -98,7 +99,7 @@ class MMBertEmbeddings(BertEmbeddings):
             """
             self.seg_embeddings = nn.Embedding(256, config.hidden_size)
 
-    def forward(
+    def forward_old(
         self,
         input_ids,
         input_video_embeds,
@@ -124,7 +125,7 @@ class MMBertEmbeddings(BertEmbeddings):
                 skip input_video_embeds.size(1) for the right
                 position_ids for video [SEP] and rest text tokens.
             (2) MMFusionShare for two forward passings:
-                in `forward_text`: input_video_embeds is None.
+                in forward_text: input_video_embeds is None.
                     need to skip video [SEP] token.
 
             # video_len + 1: [CLS] + video_embed
@@ -161,13 +162,82 @@ class MMBertEmbeddings(BertEmbeddings):
                 inputs_embeds[:, :1], input_video_embeds, inputs_embeds[:, 1:]
             ], dim=1)
         else:
-            # text only for `MMFusionShare`.
+            # text only for MMFusionShare.
             inputs_mm_embeds = inputs_embeds
 
         position_embeddings = self.position_embeddings(position_ids)
         token_type_embeddings = self.token_type_embeddings(token_type_ids)
         embeddings = inputs_mm_embeds + position_embeddings
         embeddings += token_type_embeddings
+
+        embeddings = self.LayerNorm(embeddings)
+        embeddings = self.dropout(embeddings)
+        return embeddings
+
+    def forward(
+        self,
+        input_ids,
+        input_video_embeds,
+        token_type_ids=None,
+        position_ids=None,
+        inputs_embeds=None,
+    ):
+        # ——— build the “MM” inputs just like original ———
+        input_tensor = input_ids if input_ids is not None else inputs_embeds
+        if input_video_embeds is not None:
+            input_shape = (
+                input_tensor.size(0),
+                input_tensor.size(1) + input_video_embeds.size(1),
+            )
+        else:
+            input_shape = (input_tensor.size(0), input_tensor.size(1))
+
+        if token_type_ids is None:
+            token_type_ids = torch.zeros(
+                input_shape, dtype=torch.long, device=self.position_ids.device
+            )
+
+        if inputs_embeds is None:
+            inputs_embeds = self.word_embeddings(input_ids)
+
+        if input_video_embeds is not None:
+            # insert video tokens after [CLS]
+            inputs_mm_embeds = torch.cat([
+                inputs_embeds[:, :1],          # [CLS]
+                input_video_embeds,            # video frames
+                inputs_embeds[:, 1:],          # rest of text
+            ], dim=1)
+        else:
+            inputs_mm_embeds = inputs_embeds
+
+        # ——— build fresh position_ids for the full sequence length ———
+        batch_size, L, _ = inputs_mm_embeds.size()
+        device = inputs_mm_embeds.device
+        position_ids = torch.arange(L, dtype=torch.long, device=device)
+        position_ids = position_ids.unsqueeze(0).expand(batch_size, L)
+
+        # ——— only if we exceed the pretrained max do we interpolate ———
+        old_max, D = self.position_embeddings.weight.shape
+        if L > old_max:
+            # 1) take (old_max, D) → (1, D, old_max)
+            pe = self.position_embeddings.weight.data.transpose(0, 1).unsqueeze(0)
+            # 2) interpolate along dim=2 to size=L → (1, D, L)
+            pe = F.interpolate(pe, size=L, mode="linear", align_corners=False)
+            # 3) back to (L, D)
+            new_pe = pe.squeeze(0).transpose(0, 1)
+
+            # 4) rebuild the nn.Embedding in-place
+            new_emb = nn.Embedding(L, D).to(new_pe.device)
+            with torch.no_grad():
+                new_emb.weight.copy_(new_pe)
+            self.position_embeddings = new_emb
+
+        # ——— fetch embeddings and combine ———
+        position_embeddings = self.position_embeddings(position_ids)
+        token_type_embeddings = self.token_type_embeddings(token_type_ids)
+
+        embeddings = inputs_mm_embeds + position_embeddings
+        embeddings = embeddings + token_type_embeddings
 
         embeddings = self.LayerNorm(embeddings)
         embeddings = self.dropout(embeddings)
