@@ -174,6 +174,7 @@ class MMBertEmbeddings(BertEmbeddings):
         embeddings = self.dropout(embeddings)
         return embeddings
 
+    # NEW VERSION: support positional embedding more than 512 length
     def forward(
         self,
         input_ids,

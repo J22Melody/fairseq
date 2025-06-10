@@ -42,10 +42,13 @@ MAX_FRAMES_DEFAULT = 256  # Default truncate length, can be overridden
 
 # Model configurations (keep these unchanged)
 model_configs = [
-    ("default", "signclip_v1_1/baseline_temporal_inference"), # multilingual pretrained
+    ("default", "signclip_v1_1/baseline_temporal"), # multilingual pretrained
     ("asl_citizen", "signclip_asl/asl_citizen_finetune"), # fine-tuned on ASL Citizen
     ("asl_finetune", "signclip_asl/asl_finetune"), # fine-tuned on three ASL datasets
-    ("suisse", "signclip_suisse/suisse_finetune_inference"), # fine-tuned on Signsuisse
+    ("suisse", "signclip_suisse/suisse_finetune"), # fine-tuned on Signsuisse
+    # below are config files for longer duration inference and absuluate checkpoint path
+    # ("default", "signclip_v1_1/baseline_temporal_inference"), # multilingual pretrained
+    # ("suisse", "signclip_suisse/suisse_finetune_inference"), # fine-tuned on Signsuisse
 ]
 
 # Cache for models that have been lazily initialized.
@@ -72,8 +75,8 @@ def get_model(model_name):
 
     # Load the model, tokenizer, and aligner.
     model, tokenizer, aligner = MMPTModel.from_pretrained(
-        # f"projects/retri/{config_path}.yaml",
-        f"/home/zifjia/fairseq/examples/MMPT/projects/retri/{config_path}.yaml",
+        f"projects/retri/{config_path}.yaml",
+        # f"/home/zifjia/fairseq/examples/MMPT/projects/retri/{config_path}.yaml",
         video_encoder=None,
     )
     model.eval()
@@ -166,6 +169,7 @@ def embed_pose(pose, model_name='default'):
         pose_frames = preprocess_pose(p)
         pose_frames_l.append(pose_frames)
 
+    # Batch padding
     # 1) find the longest sequence
     max_len = max(pf.shape[1] for pf in pose_frames_l)
 
