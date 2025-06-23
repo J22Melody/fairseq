@@ -56,6 +56,7 @@ def read_vtt(vtt_path):
 
 # Model configurations
 model_configs = [
+    ("multilingual", "signclip_v1_1/baseline_temporal_inference"),
     ("default", "signclip_bsl/bobsl_islr_finetune_long_context"),
     ("lip", "signclip_bsl/bobsl_islr_lip_long_context"),
     ("lip_only", "signclip_bsl/bobsl_islr_lip_only_long_context"),
@@ -456,7 +457,7 @@ def main():
         "--model_name",
         type=str,
         default="default",
-        choices=["default", "lip", "lip_only"],
+        choices=["default", "lip", "lip_only", "multilingual"],
         help="Model name to use ('default', 'lip', or 'lip_only')."
     )
     parser.add_argument(
@@ -655,7 +656,8 @@ def main():
                 batch_texts = subtitle_texts[i:i+args.batch_size]
                 batch_embeddings = []
                 for text in batch_texts:
-                    emb = embed_text(text, model_name=args.model_name)
+                    text_prompt = f"<en> <bfi> {text}"
+                    emb = embed_text(text_prompt, model_name=args.model_name)
                     batch_embeddings.append(emb[0])
                 batch_embeddings = np.stack(batch_embeddings, axis=0)
                 subtitle_embedding_batches.append(batch_embeddings)
@@ -712,7 +714,8 @@ def live_embed_subtitles(cues, model_name="default", batch_size=_DEFAULT_BATCH_S
         batch_embeddings = []
         for text in batch_texts:
             with suppress_fairseq_output():
-                emb = embed_text(text, model_name=model_name)
+                text_prompt = f"<en> <bfi> {text}"
+                emb = embed_text(text_prompt, model_name=model_name)
             # emb is expected to have shape [1, embedding_dim]; take the first row.
             batch_embeddings.append(emb[0])
         batch_embeddings = np.stack(batch_embeddings, axis=0)
@@ -738,7 +741,8 @@ def live_embed_subtitles(cues, model_name="default", batch_size=_DEFAULT_BATCH_S
             batch_token_embeddings = []
             for token in batch_tokens:
                 with suppress_fairseq_output():
-                    emb = embed_text(token, model_name=model_name)
+                    text_prompt = f"<en> <bfi> {token}"
+                    emb = embed_text(text_prompt, model_name=model_name)
                 batch_token_embeddings.append(emb[0])
             batch_token_embeddings = np.stack(batch_token_embeddings, axis=0)
             token_embedding_batches.append(batch_token_embeddings)
