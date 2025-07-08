@@ -15,6 +15,8 @@
 # limitations under the License.
 # Copyright (c) Facebook, Inc. All Rights Reserved
 
+import sys
+
 import torch
 
 from torch import nn
@@ -37,7 +39,6 @@ except ImportError:
     )
 
 from ..modules import VideoConv1D, VideoTokenMLP, MMBertEmbeddings, Multimodal_Projection
-
 
 # --------------- fine-tuning models ---------------
 class MMBertForJoint(BertPreTrainedModel):
@@ -140,6 +141,11 @@ class MMBertForTokenClassification(BertPreTrainedModel):
 
 # ------------ pre-training models ----------------
 
+sys.path.append("/athenahomes/zifan/pose-islr")
+from src.models.components.agcn_modules.agcn import AGCN
+from src.models.components.conformer_modules.conformer_ import Conformer
+from src.models.components.conformer_modules.conformer import Encoder as ConformerEncoder
+from src.models.components.cosign_modules.cosign import CoSign
 
 class MMBertForEncoder(BertPreTrainedModel):
     """A BertModel for Contrastive Learning."""
@@ -174,6 +180,142 @@ class MMBertForEncoder(BertPreTrainedModel):
         #     final_classifier_head=False,
         # )
 
+        self.use_agcn = getattr(config, "use_agcn", False)
+        self.use_conformer = getattr(config, "use_conformer", False)
+        self.use_cosign = getattr(config, "use_cosign", False)
+
+        if self.use_agcn:
+            agcn_cfg = getattr(config, "agcn_config", {})
+            
+            # Set defaults if not provided
+            graph_args = agcn_cfg.get("graph_args", {"labeling_mode": "spatial"})
+            num_joints = agcn_cfg.get("num_point", 203)
+            dropout = agcn_cfg.get("dropout", 0.0)
+            dropedge = agcn_cfg.get("dropedge", 0.1)
+            in_channels = agcn_cfg.get("in_channels", 3)  # 3D keypoints
+
+            self.num_joints = num_joints  # used in forward reshape logic
+
+            self.agcn = AGCN(
+                in_channels=in_channels,
+                graph_args=graph_args,
+                edge_importance_weighting=True,
+                temporal_kernel_size=9,
+                num_joints=num_joints,
+                init_size=64,
+                num_layers=getattr(config, "agcn_layers", 4),
+                dropout=dropout,
+            )
+
+            if self.use_conformer:
+                conformer_cfg = getattr(config, "conformer_config", {})
+
+                input_dim = conformer_cfg.get("input_dim", self.agcn.output_size)  # likely 1280
+                hidden_size = conformer_cfg.get("hidden_size", 1024)  # specified
+
+                self.conformer_mapper = nn.Linear(input_dim, hidden_size)
+
+                self.conformer = Conformer(
+                    dim=hidden_size,
+                    depth=conformer_cfg.get("depth", 2),
+                    dim_head=conformer_cfg.get("dim_head", 128),
+                    heads=conformer_cfg.get("heads", 8),
+                    ff_mult=conformer_cfg.get("ff_mult", 4),
+                    conv_expansion_factor=conformer_cfg.get("conv_expansion_factor", 1),
+                    conv_kernel_size=conformer_cfg.get("conv_kernel_size", [5]),
+                    attn_dropout=conformer_cfg.get("dropout", 0.0),
+                    ff_dropout=conformer_cfg.get("dropout", 0.0),
+                    conv_dropout=conformer_cfg.get("dropout", 0.0),
+                    pool=conformer_cfg.get("pool", "mean"),
+                    use_vel=conformer_cfg.get("use_vel", False),
+                )
+
+                self.conformer_proj = nn.Linear(hidden_size, config.hidden_size)  # 1024 → 768
+            else:
+                # Project AGCN output to hidden size for BERT
+                self.agcn_proj = nn.Linear(self.agcn.output_size, config.hidden_size)
+
+        elif self.use_cosign:
+            self.cosign = CoSign(
+                body_encoder=AGCN(
+                    in_channels=64,
+                    graph_args={"layout": "body33", "strategy": "spatial"},
+                    num_joints=33,
+                    edge_importance_weighting=True,
+                    temporal_kernel_size=7,
+                    init_size=64,
+                    num_layers=4,
+                    channel_multipliers=[2, 1, 1.5, 2],
+                    dropout=0.1,
+                    use_se=True,
+                ),
+                face_encoder=AGCN(
+                    in_channels=64,
+                    graph_args={"layout": "face128", "strategy": "spatial"},
+                    num_joints=128,
+                    edge_importance_weighting=True,
+                    temporal_kernel_size=7,
+                    init_size=64,
+                    num_layers=4,
+                    channel_multipliers=[2, 1, 1.5, 2],
+                    dropout=0.1,
+                    use_se=True,
+                ),
+                hand_encoder=AGCN(
+                    in_channels=64,
+                    graph_args={"layout": "hand21", "strategy": "spatial"},
+                    num_joints=21,
+                    edge_importance_weighting=True,
+                    temporal_kernel_size=7,
+                    init_size=64,
+                    num_layers=4,
+                    channel_multipliers=[2, 1, 1.5, 2],
+                    dropout=0.1,
+                    use_se=True,
+                ),
+                sequence_model=ConformerEncoder(
+                    input_dim=1536,
+                    hidden_size=512,
+                    depth=4,
+                    dim_head=128,
+                    heads=8,
+                    ff_mult=4,
+                    conv_expansion_factor=2,
+                    conv_kernel_size=[5],
+                    dropout=0.1,
+                    pool=None,
+                    use_vel=False,
+                ),
+                expert_model=ConformerEncoder(
+                    input_dim=384,
+                    hidden_size=512,
+                    depth=4,
+                    dim_head=128,
+                    heads=8,
+                    ff_mult=4,
+                    conv_expansion_factor=2,
+                    conv_kernel_size=[5],
+                    dropout=0.1,
+                    pool=None,
+                    use_vel=False,
+                ),
+                separate_expert=False,
+                separate_hand=False,
+                output_dim=512,
+                use_mapping=True,
+                aggregate="flatten",
+                joint_embedding=False,
+                modality_fusion=False,
+                pretrained=None
+            )
+            cosign_dim = 512
+            self.cosign_proj = nn.Linear(cosign_dim, config.hidden_size)
+
+        else:
+            self.videoconv = VideoConv1D(config) if hasattr(config, "conv1d") else None
+            self.videomlp = VideoTokenMLP(config)
+
+
     def forward(
         self,
         input_ids=None,
@@ -192,18 +334,37 @@ class MMBertForEncoder(BertPreTrainedModel):
             else self.config.use_return_dict
         )
 
-        # print(input_video_embeds.shape)
-
         if input_video_embeds is not None:
-            if self.perceiver:
-                video_tokens = self.perceiver(input_video_embeds)
+            if self.use_agcn:
+                # Input: [B, T, D] → reshape to [B, T, V, C]
+                B, T, D = input_video_embeds.shape
+                V = self.num_joints
+                C = D // V
+                x = input_video_embeds.view(B, T, V, C)
+                x = self.agcn(x)  # [B, C', T, V]
+                x = x.mean(-1).permute(0, 2, 1)  # → [B, T, C']
+
+                if self.use_conformer:
+                    x = self.conformer_mapper(x)
+                    x = self.conformer.get_features(x)  # [B, T, D], no pooling
+                    x = self.conformer_proj(x)
+                else:
+                    x = self.agcn_proj(x)
+
+                video_tokens = x  # Final output shape: [B, T, hidden_size]
+            elif self.use_cosign:
+                # Infer mask by checking for zero-padding
+                with torch.no_grad():
+                    frame_energy = input_video_embeds.abs().sum(dim=-1)  # [B, T]
+                    inferred_mask = frame_energy > 1e-5                  # [B, T] boolean
+
+                cosign_outputs = self.cosign(input_video_embeds, mask=inferred_mask)
+                video_tokens = cosign_outputs["pooled_all"]
+                video_tokens = self.cosign_proj(video_tokens)
             else:
                 video_tokens = self.videomlp(self.videoconv(input_video_embeds)) if self.videoconv else self.videomlp(input_video_embeds)
         else:
             video_tokens = None
-
-        # print(video_tokens.shape)
-        # exit()
 
         outputs = self.bert(
             input_ids,

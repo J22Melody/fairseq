@@ -150,6 +150,14 @@ class MMFusion(nn.Module):
                 model_config.dropout = config.model.dropout
                 model_config.attention_probs_dropout_prob = config.model.dropout
                 model_config.hidden_dropout_prob = config.model.dropout
+
+            if "use_agcn" in config.model:
+                model_config.use_agcn = config.model.use_agcn
+            if "use_conformer" in config.model:
+                model_config.use_conformer = config.model.use_conformer
+            if "use_cosign" in config.model:
+                model_config.use_cosign = config.model.use_cosign
+
             self.video_encoder = video_encoder_cls.from_pretrained(
                 config.dataset.bert_name, config=model_config)
             # exact same NLP model from Huggingface.
@@ -164,6 +172,7 @@ class MMFusion(nn.Module):
             l2_norm = config.model.multimodal_projection == 'l2_norm'
             self.video_projection = Multimodal_Projection(l2_norm)
             self.text_projection = Multimodal_Projection(l2_norm)
+
 
     def forward(
         self,

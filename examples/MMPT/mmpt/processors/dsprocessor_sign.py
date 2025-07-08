@@ -627,7 +627,7 @@ class SignCLIPMetaProcessorV2(MetaProcessor):
 
             if config.debug:
                 split_debug = 'validation' if split == 'validation' else 'test'
-                self.data_l = list(tfds.load(name=dataset, builder_kwargs=dict(config=sd_config), data_dir=config.data_dir)[split_debug])[:1000]
+                self.data_l = list(tfds.load(name=dataset, builder_kwargs=dict(config=sd_config), data_dir=config.data_dir)[split_debug])[:10000]
 
                 # Group examples by text prompts
                 self.text_to_idxs = defaultdict(list)
