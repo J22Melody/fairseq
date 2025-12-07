@@ -1,8 +1,8 @@
 dataset:
   # debug: true
   debug: false
-  max_video_len: 32
-  max_len: 32
+  max_video_len: 400
+  max_len: 256
   meta_processor: SignCLIPMetaProcessorV2
   video_processor: SignCLIPPoseProcessor
   text_processor: TextProcessor
@@ -17,6 +17,9 @@ dataset:
   aligner: DSAligner
   pose_components: 'reduced_face'
   sp_universal_tagging: true
+  # augment_temporal: true
+  # augment_temporal_chance: 0.05
+  # augment_magic: true
 fairseq:
   common:
     fp16: true
@@ -44,12 +47,11 @@ fairseq:
     max_epoch: 25
   checkpoint:
     restore_file: runs/retri_v1_1/baseline_temporal/checkpoint_best.pt
-    # restore_file: runs/retri_bsl/bobsl_islr_cosign/checkpoint_last.pt
     no_epoch_checkpoints: true
     reset_optimizer: true
     reset_dataloader: true
     reset_meters: true
-    save_dir: runs/retri_bsl/bobsl_islr_cosign
+    save_dir: runs/retri_bsl/bobsl_islr_cosign_aug
 task_type: sweep_small
 model:
   model_cls: MMFusionSeparate
@@ -59,7 +61,8 @@ model:
   num_hidden_video_layers: 4
   vfeat_dim: 609
   use_cosign: true
+  # use_cosign_training: true
 loss:
   loss_cls: MMContraLoss
 eval:
-  save_path: runs/retri_bsl/bobsl_islr_cosign
+  save_path: runs/retri_bsl/bobsl_islr_cosign_aug

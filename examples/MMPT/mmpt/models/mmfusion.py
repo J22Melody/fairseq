@@ -157,6 +157,8 @@ class MMFusion(nn.Module):
                 model_config.use_conformer = config.model.use_conformer
             if "use_cosign" in config.model:
                 model_config.use_cosign = config.model.use_cosign
+            if "use_cosign_training" in config.model:
+                model_config.use_cosign_training = config.model.use_cosign_training
 
             self.video_encoder = video_encoder_cls.from_pretrained(
                 config.dataset.bert_name, config=model_config)

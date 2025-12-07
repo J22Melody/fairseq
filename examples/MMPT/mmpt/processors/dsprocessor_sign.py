@@ -4,6 +4,7 @@ Processors for SignCLIP
 
 import json
 import os
+import sys
 import pickle
 import random
 import math
@@ -30,6 +31,8 @@ import mediapipe as mp
 mp_holistic = mp.solutions.holistic
 FACEMESH_CONTOURS_POINTS = [str(p) for p in sorted(set([p for p_tup in list(mp_holistic.FACEMESH_CONTOURS) for p in p_tup]))]
 
+sys.path.append("/athenahomes/zifan/pose-islr")
+from src.processors.augmentation import gaussian_noise, drop_joint, augment2d, spatial_flip
 
 class PoseProcessor(VideoProcessor):
     def __init__(self, config):
@@ -44,6 +47,7 @@ class PoseProcessor(VideoProcessor):
         self.max_video_len = config.max_video_len
         self.preprocess = config.preprocess
         self.anonym_pose = config.anonym_pose
+        self.augment_magic = config.augment_magic
         self.is_training = (config.split == 'train') and (not config.train_for_test)
 
         np.random.seed(42)
@@ -120,7 +124,19 @@ class PoseProcessor(VideoProcessor):
 
         feat = np.nan_to_num(pose.body.data)
         feat = feat.reshape(feat.shape[0], -1)
-        
+
+        if self.is_training and self.augment_magic:
+            data_numpy = feat.reshape(feat.shape[0], -1, 3).transpose(2, 0, 1)[..., np.newaxis].copy()
+
+            # data_numpy = spatial_flip(data_numpy)
+            # data_numpy = augment2d(np.transpose(data_numpy, (1, 3, 2, 0)), rotation_std=0.3)  # shape: (T, 1, V, 3)
+            # data_numpy = np.transpose(data_numpy, (3, 0, 2, 1))  # shape: (3, T, V, 1)
+            data_numpy = gaussian_noise(data_numpy, std=0.005)
+            data_numpy = drop_joint(data_numpy)
+
+            # Final reshape
+            feat = np.transpose(data_numpy, (1, 3, 2, 0)).reshape(feat.shape[0], -1)
+
         return feat
 
     def pose_normalization_info(self, pose_header):

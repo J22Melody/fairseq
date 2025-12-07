@@ -183,6 +183,7 @@ class MMBertForEncoder(BertPreTrainedModel):
         self.use_agcn = getattr(config, "use_agcn", False)
         self.use_conformer = getattr(config, "use_conformer", False)
         self.use_cosign = getattr(config, "use_cosign", False)
+        self.use_cosign_training = getattr(config, "use_cosign_training", False)
 
         if self.use_agcn:
             agcn_cfg = getattr(config, "agcn_config", {})
@@ -306,7 +307,8 @@ class MMBertForEncoder(BertPreTrainedModel):
                 aggregate="flatten",
                 joint_embedding=False,
                 modality_fusion=False,
-                pretrained=None
+                pretrained=None,
+                is_training=self.use_cosign_training
             )
             cosign_dim = 512
             self.cosign_proj = nn.Linear(cosign_dim, config.hidden_size)

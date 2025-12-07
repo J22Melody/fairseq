@@ -58,6 +58,8 @@ def read_vtt(vtt_path):
 model_configs = [
     ("multilingual", "signclip_v1_1/baseline_temporal_inference"),
     ("default", "signclip_bsl/bobsl_islr_finetune_long_context"),
+    ("cosign", "signclip_bsl/bobsl_islr_cosign_long_context"),
+    ("cosign_aug", "signclip_bsl/bobsl_islr_cosign_aug_inference"),
     ("lip", "signclip_bsl/bobsl_islr_lip_long_context"),
     ("lip_only", "signclip_bsl/bobsl_islr_lip_only_long_context"),
 ]
@@ -457,7 +459,7 @@ def main():
         "--model_name",
         type=str,
         default="default",
-        choices=["default", "lip", "lip_only", "multilingual"],
+        choices=["default", "cosign", "cosign_aug", "lip", "lip_only", "multilingual"],
         help="Model name to use ('default', 'lip', or 'lip_only')."
     )
     parser.add_argument(
