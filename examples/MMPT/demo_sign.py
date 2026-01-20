@@ -188,7 +188,7 @@ def embed_pose(pose, model_name='default'):
 
     batch_size = len(poses)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         output = model(pose_frames_l,
                        caps.repeat(batch_size, 1),
                        cmasks.repeat(batch_size, 1),
@@ -230,7 +230,7 @@ def embed_text(text, model_name='default'):
     pose_frames = torch.randn(batch_size, 1, placeholder_dim)
 
     # Run the model forward pass only once with the full batch.
-    with torch.no_grad():
+    with torch.inference_mode():
         output = model(pose_frames, caps_batch, cmasks_batch, return_score=False)
     
     # Extract the pooled text embeddings and return as a NumPy array.
@@ -245,7 +245,7 @@ def score_pose_and_text(pose, text, model_name="default", max_frames=None):
     pose_frames = preprocess_pose(pose, max_frames)
     caps, cmasks = preprocess_text(text, model_name)
 
-    with torch.no_grad():
+    with torch.inference_mode():
         output = model(pose_frames, caps, cmasks, return_score=True)
 
     return text, float(output["score"])  # dot-product
